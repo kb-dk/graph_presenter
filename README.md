@@ -27,7 +27,7 @@ and visually marked through the GUI.
 
 
 ## How-to
-* Generate a graph using Gephy and export is as a SVG.
+* Generate a graph using Gephi and export is as a SVG.
 * Call `./generate_presentation.sh mygraph.svg mypresentation`
 * Upload the generated folder `mypresentation` to a webserver or open `mypresentation/index.html` locally
 

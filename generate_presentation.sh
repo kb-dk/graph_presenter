@@ -28,7 +28,7 @@ DZI="${B}.dzi"
 : ${RENDER_SIZE:="20000"}
 : ${RENDER_WIDTH:="$RENDER_SIZE"}
 : ${RENDER_HEIGHT:="$RENDER_SIZE"}
-: ${FORMAT:="png"} # Gephy charts are circles, lines and text so PNG is probably best choice
+: ${FORMAT:="png"} # Gephi charts are circles, lines and text so PNG is probably best choice
 
 # Where to get OpenSeadragon
 : ${OSD_VERSION:=2.2.1}
