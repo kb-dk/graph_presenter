@@ -11,6 +11,11 @@ produce a DeepZoom bitmap rendering of a SVG from Gephy, presenting it using Ope
 seamless zoom & pan on modest hardware. Using the coordinates from the SVG, nodes can be searched
 and visually marked through the GUI.
 
+## Demos
+
+* [C64+Amiga domain graph from the Danish net archive](https://labs.statsbiblioteket.dk/linkgraph/c64/) - 57,432 nodes
+* [Domains from 1998-2003 from the Danish net archive](https://labs.statsbiblioteket.dk/linkgraph/1998_to_2003/) - 79,012 nodes
+
 ## Status
 
 Under construction: Everything works locally, but is in the process of being massaged to work
