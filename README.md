@@ -36,4 +36,16 @@ The size of the rendered DeepZoom image can be controlled using `RENDER_SIZE`. T
 RENDER_SIZE=50000 ./generate_presentation.sh mygraph.svg mypresentation
 ```
 
-Note: Rendering in 50K is doable on a 16GB machine, but might take hours. More RAM helps a lot. GraphicsMagic is the bottleneck here. A better scaling SVG→PNG converter would be a welcome addition.
+## De-mystifying
+The `./generate_presentation.sh` script is at its core extremely simple:
+
+1. Use GraphicsMagic to convert the SVG to PNG: `gm convert -size 20000x20000 mygraph.svg mygraph.png`
+2. Create DeepZoom tiles from the `png`: `vips dzsave mygraph.png mygraph --suffix .png`
+3. Extract node-names & coordinates: `tr '\n' ' ' < mygraph.svg | grep -o "<circle [^/]*/>" | sed 's/<circle.* r="\([^"]*\)".* cx="\([^"]*\)".* class="id_\([^"]*\)".* cy="\([^"]*\)".*\/>/\3 \2 \4 \1/' | LC_ALL=C sort`
+
+The JavaScript `domain_control.js` supports search by looking sequentially through all the node-names generated in step #3 and getting their coordinates. For each of these coordinates, an overlay is added to the OpenSeadragon display.
+
+
+# Notes & to-do
+* Rendering in 50K is doable on a 16GB machine, but might take hours. More RAM helps a lot. GraphicsMagic is the bottleneck here. A better scaling SVG→PNG converter would be a welcome addition.
+* GraphicsMagic has a problem with kerning for some renders. It should be investigated whether changing fonts could help here.
