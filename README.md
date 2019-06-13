@@ -1,6 +1,9 @@
 # graph_presenter
 Generates searchable DeepZoom presentations of Gephi graphs
 
+Primarily maintained by Toke Eskildsen, [toes@kb.dk](mailto:toes@kb.dk), Royal Danish Library
+
+
 ## Requirements
 
 * bash, wget, GraphicsMagic, vips
@@ -17,9 +20,11 @@ produce a DeepZoom bitmap rendering of a SVG from Gephi, presenting it using Ope
 seamless zoom & pan on modest hardware. Using the coordinates from the SVG, nodes can be searched
 and visually marked through the GUI.
 
+
 ## Demos
 * [C64+Amiga domain graph from the Danish net archive](https://labs.statsbiblioteket.dk/linkgraph/c64/) - 57,432 nodes
 * ["All" domains from 1998-2003 from the Danish net archive](https://labs.statsbiblioteket.dk/linkgraph/1998_to_2003/) - 79,012 nodes
+
 
 ## How-to
 * Generate a graph using Gephy and export is as a SVG.
@@ -31,5 +36,4 @@ The size of the rendered DeepZoom image can be controlled using `RENDER_SIZE`. T
 RENDER_SIZE=50000 ./generate_presentation.sh mygraph.svg mypresentation
 ```
 
-## Notes
-Primarily maintained by Toke Eskildsen, [toes@kb.dk](mailto:toes@kb.dk), Royal Danish Library
+Note: Rendering in 50K is doable on a 16GB machine, but might take hours. More RAM helps a lot. GraphicsMagic is the bottleneck here. A better scaling SVG→PNG converter would be a welcome addition.
