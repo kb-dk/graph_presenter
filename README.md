@@ -64,7 +64,7 @@ then follow the instructions at [Building libvips from git](https://github.com/l
 
 `vips` controls render-size of SVGs with `dpi`, but we can derive that from the input SVG and the wanted size in pixels. If we have `1998_to_2003.svg` and want DeepZoom tiles for a virtual size of 160000x160000 pixels (25 gigapixel), we can do
 ```
-echo $(( 160000 * 72 / $(head -n 100 1998_to_2003.svg | tr '\n' ' ' | grep -o '<svg[^<]*width="[0-9.]*"' | grep -o 'width=.*' | sed 's/[^0-9]*\([0-9]*\)[.].*/\1/') ))
+echo $(( 160000 * 72 / $(head -n 100 1998_to_2003.svg | tr '\n' ' ' | grep -o '<svg[^<]*width="[0-9.]*"' | grep -o 'width=.*' | sed 's/^[0-9]*\([0-9]*\).*/\1/') ))
 ```
 For this case it gives us `366` DPI, which we feed to `vips`, together with the `unlimited`-option that allow us to render SVGs larger than 10MB:
 ```
