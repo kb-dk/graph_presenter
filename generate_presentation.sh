@@ -24,6 +24,16 @@ DZI="${B}.dzi"
 : ${PNG:="${DEST}/${B}.png"}
 : ${TEMPLATE:="presentation_template.html"}
 
+# If true, only the metadata are processed
+# Use vips for generating both PNG and tiles.
+# Important: This fails for renders > 32Kx32K unless a suitable new version of vips is used.
+# See https://github.com/libvips/libvips/issues/1354 for details
+: ${VIPS_ONLY:="false"}
+
+: ${RENDER_PNG:="true"}
+: ${RENDER_TILES:="true"}
+: ${RENDER_META:="true"}
+
 # PNG & DeepZoom tile parameters
 : ${RENDER_SIZE:="20000"}
 : ${RENDER_WIDTH:="$RENDER_SIZE"}
@@ -41,7 +51,14 @@ DZI="${B}.dzi"
 popd > /dev/null
 
 function usage() {
-    echo "Usage: ./generate_presentation mygraph.svg"
+    cat <<EOF
+Usage: ./generate_presentation mygraph.svg"
+
+See variables in source code for extra options. Specify by setting environment 
+variables before the script is calles, e.g.
+
+RENDER_SIZE=5000 RENDER_PNG=false VIPS_ONLY=true DEST=wiki_5K ./generate_presentation.sh wikipedia_dk.svg 
+EOF
     exit $1
 }
 
@@ -107,14 +124,31 @@ function ctemplate() {
     rm "$TMP"
 }
 
+# Returns largest DPI from wanted width & height 
+get_dpi() {
+    local W_DPI=$(( "$RENDER_WIDTH" * 72 / $(head -n 100 "$SVG" | tr '\n' ' ' | grep -o '<svg[^<]*width="[0-9.]*"' | grep -o 'width=.*' | sed 's/[^0-9]*\([0-9]*\).*/\1/') ))
+    local H_DPI=$(( "$RENDER_HEIGHT" * 72 / $(head -n 100 "$SVG" | tr '\n' ' ' | grep -o '<svg[^<]*height="[0-9.]*"' | grep -o 'height=.*' | sed 's/[^0-9]*\([0-9]*\).*/\1/') ))
+    if [[ "$W_DPI" -lt "$H_DPI" ]]; then
+        echo "$H_DPI"
+    else
+        echo "$W_DPI"
+    fi
+}
+
 create_png() {
     if [[ -s "$PNG" ]]; then
         echo "- Skipping generation of $PNG as it already exists"
         return
     fi
-    echo "- Generating $PNG with dimensions ${RENDER_WIDTH}x${RENDER_HEIGHT} pixels"
-    # ImageMagic does not handle large SVGs well, so we use GraphicsMagic
-    gm convert -size ${RENDER_WIDTH}x${RENDER_HEIGHT} "$SVG" "$PNG"
+    if [[ "true" == "$VIPS_ONLY" ]]; then
+        local DPI=$(get_dpi)
+        echo "- Generating $PNG with minimum dimensions ${RENDER_WIDTH}x${RENDER_HEIGHT} pixels (dpi=${SPI}) using vips"
+        vips copy "${SVG}[dpi=${DPI},unlimited]" "$PNG"
+    else
+        echo "- Generating $PNG with dimensions ${RENDER_WIDTH}x${RENDER_HEIGHT} pixels using GraphicsMagic"
+        # ImageMagic does not handle large SVGs well, so we use GraphicsMagic
+        gm convert -size ${RENDER_WIDTH}x${RENDER_HEIGHT} "$SVG" "$PNG"
+    fi
 }
 
 create_deepzoom() {
@@ -122,10 +156,32 @@ create_deepzoom() {
         echo "- Skipping DeepZoom tile generation as '${DEST}/${B}_files' already exists"
         return
     fi
-    echo "- Generating DeepZoom tiles in ${DEST}/${B}_files"
-    pushd "$DEST" > /dev/null
-    vips dzsave ${PNG_ABSOLUTE} ${B} --suffix .$FORMAT
-    popd > /dev/null
+
+    local VIPS_DIRECT=false
+    if [[ ! -s "$PNG" ]]; then
+        if [[ "false" == "$VIPS_ONLY" ]]; then
+            echo "- Illegal combination: No PNG and VIPS_ONLY=false. Force-enabling direct vips based SVG→tiles rendering"
+        fi
+        VIPS_DIRECT="true"
+    else
+        if [[ "true" == "$VIPS_ONLY" ]]; then
+            echo "- PNG exists (${PNG}), but VIPS_ONLY=true: Tiles will be generated from SVG ($SVG)"
+            VIPS_DIRECT="true"
+        fi
+        
+    fi
+    if [[ "true" == "$VIPS_DIRECT" ]]; then
+        local DPI=$(get_dpi)
+        echo "- Generating DeepZoom tiles in ${DEST}/${B}_files using vips from SVG with DPI=${DPI}"
+        pushd "$DEST" > /dev/null
+        vips dzsave "${SVG_ABSOLUTE}[dpi=${DPI},unlimited]" ${B} --suffix .$FORMAT
+        popd > /dev/null
+    else
+        echo "- Generating DeepZoom tiles in ${DEST}/${B}_files using vips from PNG"
+        pushd "$DEST" > /dev/null
+        vips dzsave ${PNG_ABSOLUTE} ${B} --suffix .$FORMAT
+        popd > /dev/null
+    fi
 }
 
 
@@ -202,13 +258,32 @@ copy_files() {
 # CODE
 ###############################################################################
 
+S_START=$(date +%s)
 check_parameters "$@"
 echo "Starting processing of $SVG $(date +"%Y-%m%d %H:%M")"
-fetch_dragon
 
-create_png
-create_deepzoom
-extract_all_json
-copy_files
+if [[ "true" == "$RENDER_PNG" ]]; then
+    create_png
+elif [[ "false" == "$VIPS_ONLY" ]]; then
+    echo "- RENDER_PNG=${RENDER_PNG} specified, but with VIPS_ONLY=${VIPS_ONLY}, a PNG is required and will thus be rendered anywat"
+    create_png
+else
+    echo "- Skipping rendering of PNG as RENDER_PNG=${RENDER_PNG}"
+fi
 
-echo "Finished $(date +"%Y-%m%d %H:%M"), result in $DEST"
+if [[ "true" == "$RENDER_TILES" ]]; then
+    create_deepzoom
+else
+    echo "- Skipping rendering of tiles as RENDER_TILES=${RENDER_TILES}"
+fi
+
+if [[ "true" == "$RENDER_META" ]]; then
+    fetch_dragon
+    extract_all_json
+    copy_files
+else
+    echo "- Skipping rendering of metadata (nodes.js, index.html and supporting files)"
+fi
+
+S_END=$(date +%s)
+echo "Finished $(date +"%Y-%m%d %H:%M") ($((S_END-S_START)) seconds), result in $DEST"
