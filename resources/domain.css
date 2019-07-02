@@ -130,6 +130,7 @@ a:active 	{ color: #f00; }
     -webkit-animation: spin-link 7s linear infinite;
     -moz-animation: spin-link 7s linear infinite;
     animation: spin-link 7s linear infinite;
+    animation-direction: reverse;
 }
 .domain-overlay-out {
     border: 3px solid green;

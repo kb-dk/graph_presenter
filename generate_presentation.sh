@@ -215,7 +215,7 @@ extract_viewbox() {
 # domain x y r
 extract_nodes_circles_raw() {
     if [[ ! -s "$DAT_POS" ]]; then
-        tr '\n' ' ' < "$SVG" | grep -o "<circle [^/]*/>" | sed 's/<circle.* r="\([^"]*\)".* cx="\([^"]*\)".* class="id_\([^"]*\)".* cy="\([^"]*\)".*\/>/\3 \2 \4 \1/' | LC_ALL=C sort > "$DAT_POS"
+        tr '\n' ' ' < "$SVG" | grep -o "<circle [^/]*/>" | sed 's/<circle.* r="\([^"]*\)".* cx="\([^"]*\)".* class="id_\([^"]*\)".* cy="\([^"]*\)".*\/>/\3 \2 \4 \1/' | LC_ALL=C sort -u > "$DAT_POS"
     fi
     cat "$DAT_POS"
 }
@@ -294,7 +294,7 @@ links_to_ids_grep() {
     echo -n "["
     local FIRST=true
     while read -r L_NAME; do
-        local L_INDEX=$(grep -n "^${L_NAME} " "$DAT_ALL")
+        local L_INDEX=$(grep -n "^${L_NAME} " "$DAT_POS")
         local L_INDEX=${L_INDEX%%:*}
         if [[ ! "true" == "$FIRST" ]]; then
             echo -n ","
@@ -312,7 +312,7 @@ prepare_mapping() {
     while read -r D; do
         DOMAIN_INDEX_MAP["$D"]=$ID
         ID=$((ID+1))
-    done <<< $(extract_all_raw | sed 's/^\([^ ]*\) .*/\1/')
+    done <<< $(extract_nodes_circles_raw | sed 's/^\([^ ]*\) .*/\1/')
 
 }
 
@@ -327,7 +327,7 @@ extract_linked() {
     echo "var domains= ["
     while read -r TUPLE; do
         local D_NAME=${TUPLE%% *}
-        local D_INDEX=$(grep -n "^${D_NAME} " "$DAT_ALL")
+        local D_INDEX=$(grep -n "^${D_NAME} " "$DAT_POS")
         local D_INDEX=${D_INDEX%%:*}
         local L_IN=$(links_to_ids <<< $(get_links_in_names "$D_NAME" "$CACHE"))
         local L_OUT=$(links_to_ids <<< $(get_links_out_names "$D_NAME" "$CACHE"))
@@ -337,7 +337,7 @@ extract_linked() {
         # TODO: Move the sed outside of the loop for better performance
         echo "$TUPLE $L_IN $L_OUT"
 #        sed 's/\([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\)/{d:"\1", x:\2, y:\3, r:\4, in:'$L_IN', out:'$L_OUT'},/' <<< "$TUPLE"
-    done <<< $(extract_all_raw) | sed 's/\([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\)/{d:"\1", x:\2, y:\3, r:\4, in:\8, out:\9},/'
+    done <<< $(extract_nodes_circles_raw) | sed 's/\([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\)/{d:"\1", x:\2, y:\3, r:\4, in:\5, out:\6},/'
 
     echo "];"
     close_mapping
