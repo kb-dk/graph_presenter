@@ -180,3 +180,20 @@ if (typeof myDragon == 'undefined') {
         console.log("Warning: Unable to locate an element with id 'domain-feedback': Feedback on domain matching is disabled");
     }
 }
+if (typeof myDragon != 'undefined') {
+    console.log("Activating click handler");
+    myDragon.addHandler('canvas-click', function(info) {
+        var relative = myDragon.viewport.pointFromPixel(info.position);
+        var gx = relative.x*viewbox.x2 + viewbox.x1;
+        var gy = relative.y*viewbox.x2 + viewbox.y1;
+        var arrayLength = domains.length; // domains is defined in domains.js
+        for (var i = 0; i < arrayLength; i++) {
+            var d = domains[i];
+            if (d.x-d.r <= gx && d.x+d.r >= gx &&
+                d.y-d.r <= gy && d.y+d.r >= gy) {
+                markLinks(d.d, i);
+                break;
+            }
+        }
+    });
+}
