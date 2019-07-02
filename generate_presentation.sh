@@ -48,6 +48,11 @@ DZI="${B}.dzi"
 : ${DAT_LINKS:="${DEST}/links.dat"}
 : ${DAT_POS:="${DEST}/position.dat"}
 : ${DAT_ALL:="${DEST}/all.dat"}
+: ${DAT_CL:="${DEST}/coordinates_links.dat"}
+: ${DAT_CL_INDEX:="${DEST}/coordinates_links_index.dat"}
+: ${DAT_OUT:="${DEST}/links_out.dat"}
+: ${DAT_IN:="${DEST}/links_in.dat"}
+: ${DAT_IN_OUT:="${DEST}/links_in_out.dat"}
 
 # We need to declase associative arrays at the root (why?)
 declare -A DOMAIN_INDEX_MAP
@@ -69,7 +74,7 @@ check_parameters() {
     if [[ -z "$SVG" ]]; then
         >&2 echo "Error: No input file specified"
         usage 2
-    fi
+    fi 
     if [[ ! -s "$SVG" ]]; then
         >&2 echo "Error: Unable to read '$SVG'"
         usage 3
@@ -77,7 +82,7 @@ check_parameters() {
     mkdir -p "$DEST"
 
     local MISSING=false
-    if [[ .$(which gm) == . ]]; then
+    if [[ "false" == "$VIPS_ONLY" && .$(which gm) == . ]]; then
         >&2 echo "Error: 'gm' (GraphicsMagic) not available, please install it"
         MISSING=true
     fi
@@ -195,6 +200,36 @@ normalise_svg() {
     tr '\n' ' ' < "$SVG" | sed -e 's/> */>/g' -e 's/ *</</g' | xmllint --format - 
 }
 
+collapse() {
+    local LAST="%%%"
+    while read -r PAIR; do
+        local TOKENS=($PAIR)
+        local LEFT=${TOKENS[0]}
+        local RIGHT=${TOKENS[1]}
+        if [[ "$LAST" == "$LEFT" ]]; then
+            echo -n ",§$RIGHT§"
+        else
+            if [[ "$LAST" != "%%%" ]]; then
+                echo "]"
+            fi
+            echo -n "$LEFT [§$RIGHT§"
+        fi
+        LAST="$LEFT"
+    done
+    echo "]"
+}
+
+# domain in_links out_links
+extract_links() {
+    if [[ ! -s "$DAT_IN_OUT" ]]; then
+        # Yes we need sort both before and after collapse
+        grep 'class="id_.* id_' "$SVG" | sed 's/.*class="id_\([^ ]*\) id_\([^ ]*\)".*/\1 \2/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_OUT"
+        grep 'class="id_.* id_' "$SVG" | sed 's/.*class="id_\([^ ]*\) id_\([^ ]*\)".*/\2 \1/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_IN"
+        LC_ALL=C join -j 1 -a 1 -a 2 -e '[]' -o 0 1.2 2.2 "$DAT_IN" "$DAT_OUT" > "$DAT_IN_OUT"
+    fi
+    cat "$DAT_IN_OUT"
+}
+
 # domain in out total
 extract_link_stats() {
     if [[ ! -s "$DAT_LINKS" ]]; then
@@ -218,6 +253,30 @@ extract_nodes_circles_raw() {
         tr '\n' ' ' < "$SVG" | grep -o "<circle [^/]*/>" | sed 's/<circle.* r="\([^"]*\)".* cx="\([^"]*\)".* class="id_\([^"]*\)".* cy="\([^"]*\)".*\/>/\3 \2 \4 \1/' | LC_ALL=C sort -u > "$DAT_POS"
     fi
     cat "$DAT_POS"
+}
+
+# domain x y r in_links out_links
+extract_coordinates_links() {
+    if [[ ! -s "$DAT_CL" ]]; then
+        join -j 1 -a 1 -a 2 -e '[]' -o 0 1.2 1.3 1.4 2.2 2.3 <(extract_nodes_circles_raw) <(extract_links) > "$DAT_CL"
+    fi              
+    cat "$DAT_CL"
+}
+
+# domain x y r in_links_indexes out_links_indexes
+extract_coordinates_links_index() {
+    if [[ ! -s "$DAT_CL_INDEX" ]]; then
+        local T_SED=$(mktemp)
+        local INDEX=0
+        while read -r LINE; do
+            local D=${LINE%% *}
+            echo "s/§${D}§/${INDEX}/g" >> "$T_SED"
+            INDEX=$((INDEX+1))
+        done <<< $(extract_coordinates_links)
+        sed -f "$T_SED" <<< $(extract_coordinates_links) > "$DAT_CL_INDEX"
+        rm "$T_SED"
+    fi
+    cat "$DAT_CL_INDEX"
 }
 
 # domain x y r in out all
@@ -323,6 +382,14 @@ close_mapping() {
 }
 
 extract_linked() {
+    echo "var domains= ["
+    # wired.com -1063.7798 27.971643 5.0 [1337,1338,2129] []
+    extract_coordinates_links_index | sed 's/\([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\)/{d:"\1", x:\2, y:\3, r:\4, in:\5, out:\6},/'
+    echo "];"
+    
+}
+
+extract_linked_mapping() {
     prepare_mapping
     echo "var domains= ["
     while read -r TUPLE; do

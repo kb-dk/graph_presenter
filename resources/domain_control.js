@@ -155,18 +155,6 @@ if (typeof myDragon == 'undefined') {
 } else if (typeof domains == 'undefined') {
     console.error("Error: The variable 'domains' is not set. Unable to provide domain search");
 } else {
-    /* The domains are 1-indexed. Convert that to 0 as it fits better with javaScript */
-    var arrayLength = domains.length; // domains is defined in domains.js
-    for (var i = 0; i < arrayLength; i++) {
-        var lin = domains[i].in;
-        for (var j = 0; j < lin.length; j++) {
-            lin[j]--;
-        }
-        var lout = domains[i].out;
-        for (var j = 0; j < lout.length; j++) {
-            lout[j]--;
-        }
-    }
     /* TODO: Consider a delay mechanism to make it smooth to type */
     if (document.getElementById("domain-selector")) {
         document.getElementById("domain-selector").addEventListener("input", domainChanged);
