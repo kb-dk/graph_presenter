@@ -88,7 +88,21 @@ a:active 	{ color: #f00; }
     border-style: dashed;
     border-radius: 50%;
     background-color: rgba(255, 255, 255, 0.0); // Trick to get title to display a tooltip on hover
-                                                width: 100px;
+    width: 100px;
+    height: 100px;
+}
+.domain-overlay-in-hp {
+    border: 3px solid purple;
+    border-style: dotted;
+    background-color: rgba(255, 255, 255, 0.0); // Trick to get title to display a tooltip on hover
+    width: 100px;
+    height: 100px;
+}
+.domain-overlay-out-hp {
+    border: 3px solid green;
+    border-style: dashed;
+    background-color: rgba(255, 255, 255, 0.0); // Trick to get title to display a tooltip on hover
+    width: 100px;
     height: 100px;
 }
 
@@ -98,7 +112,7 @@ a:active 	{ color: #f00; }
     border-style: dashed;
     border-radius: 50%;
     background-color: rgba(255, 255, 255, 0.0); // Trick to get title to display a tooltip on hover
-                                                width: 100px;
+    width: 100px;
     height: 100px;
 
     // https://stackoverflow.com/questions/16771225/css3-rotate-animation
@@ -106,6 +120,29 @@ a:active 	{ color: #f00; }
     -moz-animation: spin 7s linear infinite;
     animation: spin 7s linear infinite;
 }
+.domain-overlay-in {
+    border: 3px solid purple;
+    border-style: dotted;
+    background-color: rgba(255, 255, 255, 0.0); // Trick to get title to display a tooltip on hover
+    width: 100px;
+    height: 100px;
+
+    -webkit-animation: spin-link 7s linear infinite;
+    -moz-animation: spin-link 7s linear infinite;
+    animation: spin-link 7s linear infinite;
+}
+.domain-overlay-out {
+    border: 3px solid green;
+    border-style: dashed;
+    background-color: rgba(255, 255, 255, 0.0); // Trick to get title to display a tooltip on hover
+    width: 100px;
+    height: 100px;
+
+    -webkit-animation: spin-link 7s linear infinite;
+    -moz-animation: spin-link 7s linear infinite;
+    animation: spin-link 7s linear infinite;
+}
+
 @-moz-keyframes spin {
     0%   { -moz-transform: rotate(0deg); border-color: red; }
     25%  { -moz-transform: rotate(90deg); border-color: blue; }
@@ -126,4 +163,26 @@ a:active 	{ color: #f00; }
     50%  { -webkit-transform: rotate(180deg); transform:rotate(180deg); border-color: pink; }
     75%  { -webkit-transform: rotate(270deg); transform:rotate(270deg); border-color: blue; }
     100% { -webkit-transform: rotate(360deg); transform:rotate(360deg); border-color: red; }
+}
+
+@-moz-keyframes spin-link {
+    0%   { -moz-transform: rotate(0deg); }
+    25%  { -moz-transform: rotate(-90deg); }
+    50%  { -moz-transform: rotate(-180deg); }
+    75%  { -moz-transform: rotate(-270deg); }
+    100% { -moz-transform: rotate(-360deg); }
+}
+@-webkit-keyframes spin-link {
+    0%   { -webkit-transform: rotate(0deg); }
+    25%  { -webkit-transform: rotate(-90deg); }
+    50%  { -webkit-transform: rotate(-180deg); }
+    50%  { -webkit-transform: rotate(-270deg); }
+    100% { -webkit-transform: rotate(-360deg); }
+}
+@keyframes spin-link {
+    0%   { -webkit-transform: rotate(0deg); transform:rotate(0deg); }
+    25%  { -webkit-transform: rotate(-90deg); transform:rotate(90deg); }
+    50%  { -webkit-transform: rotate(-180deg); transform:rotate(180deg); }
+    75%  { -webkit-transform: rotate(-270deg); transform:rotate(270deg); }
+    100% { -webkit-transform: rotate(-360deg); transform:rotate(360deg); }
 }

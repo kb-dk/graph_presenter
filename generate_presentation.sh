@@ -48,6 +48,9 @@ DZI="${B}.dzi"
 : ${DAT_LINKS:="${DEST}/links.dat"}
 : ${DAT_POS:="${DEST}/position.dat"}
 : ${DAT_ALL:="${DEST}/all.dat"}
+
+# We need to declase associative arrays at the root (why?)
+declare -A DOMAIN_INDEX_MAP
 popd > /dev/null
 
 function usage() {
@@ -87,7 +90,6 @@ check_parameters() {
     fi
     SVG_ABSOLUTE=$(echo "$(cd "$(dirname "$SVG")"; pwd)/$(basename "$SVG")")
     PNG_ABSOLUTE=$(echo "$(cd "$(dirname "$PNG")"; pwd)/$(basename "$PNG")")
-    
 }
 
 ################################################################################
@@ -232,6 +234,15 @@ extract_domains() {
     echo "];"
 }
 
+extract_node_map() {
+    echo "nodemap=["
+    while read -r LINE; do
+        local D=${LINE%% *}
+        echo "\"$D\"," 
+    done < "${DEST}/all.dat"
+    echo "];"
+}
+
 extract_all_json() {
     if [[ -s "${DEST}/nodes.js" ]]; then
         echo "- Skipping node data extraction as '${DEST}/nodes.js' already exists"
@@ -240,6 +251,107 @@ extract_all_json() {
     echo "- Extracting node data to ${DEST}/nodes.js"
     extract_viewbox > "${DEST}/nodes.js"
     extract_domains >> "${DEST}/nodes.js"
+}
+
+get_links_in_names() {
+    local DOMAIN="$1"
+    : ${I_CACHE:="$2"}
+    : ${I_CACHE:="$SVG"}
+    grep "class=\"id_[^ ]* id_${DOMAIN}\"" "$I_CACHE" | sed 's/class=\"id_\([^ ]*\).*/\1/'
+}
+
+get_links_out_names() {
+    local DOMAIN="$1"
+    : ${O_CACHE:="$2"}
+    : ${O_CACHE:="$SVG"}
+    grep "class=\"id_${DOMAIN} id_[^ ]*\"" "$O_CACHE" | sed 's/class=\"id_[^ ]* id_\([^ ]*\)".*/\1/'
+}
+
+extract_domain_list() {
+    echo "var domains= ["
+    extract_all_raw | sed 's/^\([^ ]*\) .*/"\1",/'
+    echo "];"
+}
+
+links_to_ids() {
+    echo -n "["
+    local FIRST=true
+    while read -r L_NAME; do
+        if [[ -z "$L_NAME" ]]; then
+            continue
+        fi
+        L_INDEX=${DOMAIN_INDEX_MAP[${L_NAME}]}
+        if [[ ! "true" == "$FIRST" ]]; then
+            echo -n ","
+        fi
+        local FIRST=false
+        echo -n "$L_INDEX"
+    done
+    echo -n "]"
+}
+
+links_to_ids_grep() {
+    echo -n "["
+    local FIRST=true
+    while read -r L_NAME; do
+        local L_INDEX=$(grep -n "^${L_NAME} " "$DAT_ALL")
+        local L_INDEX=${L_INDEX%%:*}
+        if [[ ! "true" == "$FIRST" ]]; then
+            echo -n ","
+        fi
+        local FIRST=false
+        echo -n "$L_INDEX"
+    done
+    echo -n "]"
+}
+
+prepare_mapping() {
+    local GREP_CACHE=$(mktemp)
+    grep -o "class=\"id_[^ ]* id_[^ ]*\"" "$SVG" > "$GREP_CACHE"
+    local ID=1
+    while read -r D; do
+        DOMAIN_INDEX_MAP["$D"]=$ID
+        ID=$((ID+1))
+    done <<< $(extract_all_raw | sed 's/^\([^ ]*\) .*/\1/')
+
+}
+
+close_mapping() {
+    if [[ -s "$GREP_CACHE" ]]; then
+        rm "$GREP_CACHE"
+    fi
+}
+
+extract_linked() {
+    prepare_mapping
+    echo "var domains= ["
+    while read -r TUPLE; do
+        local D_NAME=${TUPLE%% *}
+        local D_INDEX=$(grep -n "^${D_NAME} " "$DAT_ALL")
+        local D_INDEX=${D_INDEX%%:*}
+        local L_IN=$(links_to_ids <<< $(get_links_in_names "$D_NAME" "$CACHE"))
+        local L_OUT=$(links_to_ids <<< $(get_links_out_names "$D_NAME" "$CACHE"))
+#        local L_IN=$(get_links_in_names "$D_NAME" "$CACHE" | tr '\n' ' ' | tr -d ' ')
+#        local L_OUT=$(get_links_out_names "$D_NAME" "$CACHE" | tr '\n' ' ' | tr -d ' ')
+#        echo "in $L_IN"
+        # TODO: Move the sed outside of the loop for better performance
+        echo "$TUPLE $L_IN $L_OUT"
+#        sed 's/\([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\)/{d:"\1", x:\2, y:\3, r:\4, in:'$L_IN', out:'$L_OUT'},/' <<< "$TUPLE"
+    done <<< $(extract_all_raw) | sed 's/\([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\)/{d:"\1", x:\2, y:\3, r:\4, in:\8, out:\9},/'
+
+    echo "];"
+    close_mapping
+}
+
+create_linked_json() {
+    if [[ -s "${DEST}/linked.js" ]]; then
+        echo "- Skipping linked node data extraction as '${DEST}/linked.js' already exists"
+        return
+    fi
+    echo "- Extracting linked node data to ${DEST}/linked.js"
+    extract_viewbox > "${DEST}/linked.js"
+#    extract_domain_list >> "${DEST}/linked.js"
+    extract_linked >> "${DEST}/linked.js"
 }
 
 copy_files() {
@@ -279,7 +391,8 @@ fi
 
 if [[ "true" == "$RENDER_META" ]]; then
     fetch_dragon
-    extract_all_json
+#    extract_all_json
+    create_linked_json
     copy_files
 else
     echo "- Skipping rendering of metadata (nodes.js, index.html and supporting files)"
