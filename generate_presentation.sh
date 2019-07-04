@@ -91,8 +91,13 @@ check_parameters() {
         MISSING=true
     fi
     if [[ .$(which vips) == . ]]; then
-        >&2 echo "Error: 'vips' not available, please install it"
-        MISSING=true
+        if [[ "true" == "$RENDER_TILES" ]]; then
+            >&2 echo "Error: 'vips' not available, please install it"
+            MISSING=true
+        elif [[ "true" == "$VIPS_ONLY" && "true" == "$RENDER_PNG" ]]; then
+            >&2 echo "Error: 'vips' not available, please install it"
+            MISSING=true
+        fi
     fi
     if [[ "true" == "$MISSING" ]]; then
         usage 2
@@ -216,11 +221,11 @@ collapse() {
             if [[ "$LAST" != "%%%" ]]; then
                 echo "]"
             fi
-            echo -n "$LEFT [$RIGHT"
+            echo -n "$LEFT \"$RIGHT"
         fi
         LAST="$LEFT"
     done
-    echo "]"
+    echo "\""
 }
 
 # domain in_links out_links
