@@ -2,7 +2,7 @@
 
 var heavyMarked = 150;  // Limit for heavy (animated) marking
 var maxMarked =  1000;  // Overall limit for marking
-var baseRadius =   40;
+var baseRadius =   4;  // TODO: Couple this to render size
 var baseMargin =  200; // TODO: Should be coupled to zoom level
 
 var svg = null;
@@ -35,13 +35,14 @@ function updateSVGOverlay(svgXML) {
 function drawLinks(links, counter) {
     var svgLines = '';
     for (var i = 0 ; i < links.length ; i++) {
+        var link = links[i];
 /*<path fill="none" stroke-width="1.0"
               d="M -170.428101,133.646652 C -151.027847,138.653076 -129.437119,175.263123 -134.443542,194.663376"
               class="id_dukkehjem.dk id_poolforum.se" stroke-opacity="1.0"
               stroke="#ff5584"/>*/
         //console.log("Adding line " + links[i]);
         // '<circle cx="40" cy="40" r="40" stroke="red" stroke-width="4" fill="blue" />'
-        svgLines += '<path fill="none" stroke-width="1.0" d="' + links[i] + '" stroke-opacity="1.0" stroke="#ff5584"/>\n'
+        svgLines += '<path fill="none" stroke-width="1.0" d="' + link.path + '" stroke-opacity="1.0" stroke="#' + link.color + '"/>\n'
     }
     updateSVGOverlay(svgLines);
 }
@@ -56,19 +57,18 @@ function markLinks(domainName, domainIndex) {
 
     createSVGOverlay();
     var domain = domains[domainIndex];
-    console.log("Marking with in: " + domain);
     drawLinks(expandLinks(domain, domain.in, true), 0);
     drawLinks(expandLinks(domain, domain.out, false), linksIndexes(domain.in).length);
     /* Mark self */
     markChosen([domainIndex], 0, heavyMarked, maxMarked, radiusFactor, "domain-overlay", "domain-overlay-hp");
     /* Mark in-links */
-    markChosen(linksIndexes(domains[domainIndex].in), 1, heavyMarked, maxMarked, radiusFactor, "domain-overlay-in", "domain-overlay-in-hp", function(elt, domainName, domainIndex) {
+    markChosen(linksIndexes(domains[domainIndex].in), 1, heavyMarked, maxMarked, radiusFactor, "domain-overlay-mimick", "domain-overlay-mimick", function(elt, domainName, domainIndex) {
         elt.onclick = function() {
             markLinks(domainName, domainIndex);
         }
     });
     /* Mark out-links */
-    markChosen(linksIndexes(domains[domainIndex].out), 1 + linksIndexes(domains[domainIndex].in).length, heavyMarked, maxMarked, radiusFactor, "domain-overlay-out", "domain-overlay-out-hp", function(elt, domainName, domainIndex) {
+    markChosen(linksIndexes(domains[domainIndex].out), 1 + linksIndexes(domains[domainIndex].in).length, heavyMarked, maxMarked, radiusFactor, "domain-overlay-mimick", "domain-overlay-mimick", function(elt, domainName, domainIndex) {
         elt.onclick = function() {
             markLinks(domainName, domainIndex);
         }
@@ -87,16 +87,18 @@ function expandLinks(source, linksString, reverse) {
         if (tokens[i].length == 0) {
             continue;
         }
-        /* 222(-589.385315,-193.555618~-604.705933,-255.864410) */
+        /* 222(-589.385315,-193.555618~-604.705933,-255.864410#c0c0c0) */
         var subTokens = tokens[i].split("(")
         var linkIndex = subTokens[0];
-        /* -589.385315,-193.555618~-604.705933,-255.864410) */
-        var infixCoordinates = subTokens[1].replace('~', ' ').replace(')', '');
+        /* -589.385315,-193.555618~-604.705933,-255.864410#c0c0c0) */
+        var coorCol = subTokens[1].split('#');
+        var infixCoordinates = coorCol[0].replace('~', ' ');
+        var color = coorCol[1].replace(')', '');
         var destCoordinates = domains[linkIndex].x + ',' + domains[linkIndex].y;
         if (reverse) {
-            links.push("M " + destCoordinates + " C " + infixCoordinates + " " + sourceCoordinates);
+            links.push({path:"M " + destCoordinates + " C " + infixCoordinates + " " + sourceCoordinates, color: color});
         } else {
-            links.push("M " + sourceCoordinates + " C " + infixCoordinates + " " + destCoordinates);
+            links.push({path:"M " + sourceCoordinates + " C " + infixCoordinates + " " + destCoordinates, color: color});
         }
     }
     return links;

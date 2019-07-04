@@ -236,9 +236,9 @@ collapse() {
 extract_links() {
     if [[ ! -s "$DAT_IN_OUT" ]]; then
         # Yes we need sort both before and after collapse
-        normalise_svg | grep 'class="id_.* id_' | sed 's/.* d="M [^ ]* C \([^ ]*\) \([^ ]*\) .*class="id_\([^ ]*\) id_\([^ ]*\)".*/\3 §\4§(\1~\2)/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_OUT"
+        normalise_svg | grep 'class="id_.* id_' | sed 's/.* d="M [^ ]* C \([^ ]*\) \([^ ]*\) .*class="id_\([^ ]*\) id_\([^ ]*\)".*stroke="\([^"]*\)".*/\3 §\4§(\1~\2\5)/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_OUT"
         # TODO: Consider storing only the path-coordinates for one way
-        normalise_svg | grep 'class="id_.* id_' | sed 's/.* d="M [^ ]* C \([^ ]*\) \([^ ]*\) .*class="id_\([^ ]*\) id_\([^ ]*\)".*/\4 §\3§(\1~\2)/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_IN"
+        normalise_svg | grep 'class="id_.* id_' | sed 's/.* d="M [^ ]* C \([^ ]*\) \([^ ]*\) .*class="id_\([^ ]*\) id_\([^ ]*\)".*stroke="\([^"]*\)".*/\4 §\3§(\1~\2\5)/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_IN"
 #        grep 'class="id_.* id_' "$SVG" | sed 's/.*class="id_\([^ ]*\) id_\([^ ]*\)".*/\1 \2/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_OUT"
 #        grep 'class="id_.* id_' "$SVG" | sed 's/.*class="id_\([^ ]*\) id_\([^ ]*\)".*/\2 \1/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_IN"
         LC_ALL=C join -j 1 -a 1 -a 2 -e '""' -o 0 1.2 2.2 "$DAT_IN" "$DAT_OUT" > "$DAT_IN_OUT"
