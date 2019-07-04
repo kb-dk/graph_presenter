@@ -220,10 +220,10 @@ collapse() {
         local LEFT=${TOKENS[0]}
         local RIGHT=${TOKENS[1]}
         if [[ "$LAST" == "$LEFT" ]]; then
-            echo -n ",$RIGHT"
+            echo -n ";$RIGHT"
         else
             if [[ "$LAST" != "%%%" ]]; then
-                echo "]"
+                echo "\""
             fi
             echo -n "$LEFT \"$RIGHT"
         fi
@@ -241,7 +241,7 @@ extract_links() {
         normalise_svg | grep 'class="id_.* id_' | sed 's/.* d="M [^ ]* C \([^ ]*\) \([^ ]*\) .*class="id_\([^ ]*\) id_\([^ ]*\)".*/\4 §\3§(\1~\2)/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_IN"
 #        grep 'class="id_.* id_' "$SVG" | sed 's/.*class="id_\([^ ]*\) id_\([^ ]*\)".*/\1 \2/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_OUT"
 #        grep 'class="id_.* id_' "$SVG" | sed 's/.*class="id_\([^ ]*\) id_\([^ ]*\)".*/\2 \1/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_IN"
-        LC_ALL=C join -j 1 -a 1 -a 2 -e '[]' -o 0 1.2 2.2 "$DAT_IN" "$DAT_OUT" > "$DAT_IN_OUT"
+        LC_ALL=C join -j 1 -a 1 -a 2 -e '""' -o 0 1.2 2.2 "$DAT_IN" "$DAT_OUT" > "$DAT_IN_OUT"
     fi
     cat "$DAT_IN_OUT"
 }
@@ -274,7 +274,7 @@ extract_nodes_circles_raw() {
 # domain x y r in_links out_links
 extract_coordinates_links() {
     if [[ ! -s "$DAT_CL" ]]; then
-        join -j 1 -a 1 -a 2 -e '[]' -o 0 1.2 1.3 1.4 2.2 2.3 <(extract_nodes_circles_raw) <(extract_links) > "$DAT_CL"
+        join -j 1 -a 1 -a 2 -e '""' -o 0 1.2 1.3 1.4 2.2 2.3 <(extract_nodes_circles_raw) <(extract_links) > "$DAT_CL"
     fi              
     cat "$DAT_CL"
 }

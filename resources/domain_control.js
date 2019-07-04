@@ -5,7 +5,48 @@ var maxMarked =  1000;  // Overall limit for marking
 var baseRadius =   40;
 var baseMargin =  200; // TODO: Should be coupled to zoom level
 
-function markLinks(domain, domainIndex) {
+var svg = null;
+var diffusor = null;
+var svgString = '';
+function createSVGOverlay() {
+    /* Must be before the svg so that it is positioned underneath */
+    diffusor = document.createElement("div");
+    diffusor.id = "diffusor-overlay";
+    myDragon.addOverlay({
+        element: diffusor,
+        location: myDragon.viewport.getHomeBounds()
+    });
+
+    svg = document.createElement("div");
+    svg.id = "svg-overlay";
+    myDragon.addOverlay({
+        element: svg,
+        location: myDragon.viewport.getHomeBounds()
+    });
+    svgString = '';
+}
+
+function updateSVGOverlay(svgXML) {
+    svgString += svgXML;
+    svg.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;z-index:10;margin:0;padding:0;top:0;left:0;width:100%;height:100%" viewBox="' + viewbox.x1 + ' ' + viewbox.y1 + ' ' + viewbox.x2 + ' ' + viewbox.y2 + '">' + svgString + '</svg>';
+    diffusor.style.opacity = 0.8;
+}
+
+function drawLinks(links, counter) {
+    var svgLines = '';
+    for (var i = 0 ; i < links.length ; i++) {
+/*<path fill="none" stroke-width="1.0"
+              d="M -170.428101,133.646652 C -151.027847,138.653076 -129.437119,175.263123 -134.443542,194.663376"
+              class="id_dukkehjem.dk id_poolforum.se" stroke-opacity="1.0"
+              stroke="#ff5584"/>*/
+        //console.log("Adding line " + links[i]);
+        // '<circle cx="40" cy="40" r="40" stroke="red" stroke-width="4" fill="blue" />'
+        svgLines += '<path fill="none" stroke-width="1.0" d="' + links[i] + '" stroke-opacity="1.0" stroke="#ff5584"/>\n'
+    }
+    updateSVGOverlay(svgLines);
+}
+
+function markLinks(domainName, domainIndex) {
     myDragon.clearOverlays(); // FIXME: Quite clumsy to freeze the OpenSeadragon instance this way
     if (document.getElementById("domain-selector")) {
         document.getElementById("domain-selector").value = " " + domain + " ";
@@ -13,20 +54,66 @@ function markLinks(domain, domainIndex) {
     var worldW = myDragon.world.getItemAt(0).getContentSize().x;
     var radiusFactor = baseRadius/worldW;
 
+    createSVGOverlay();
+    var domain = domains[domainIndex];
+    console.log("Marking with in: " + domain);
+    drawLinks(expandLinks(domain, domain.in, true), 0);
+    drawLinks(expandLinks(domain, domain.out, false), linksIndexes(domain.in).length);
     /* Mark self */
     markChosen([domainIndex], 0, heavyMarked, maxMarked, radiusFactor, "domain-overlay", "domain-overlay-hp");
     /* Mark in-links */
-    markChosen(domains[domainIndex].in, 1, heavyMarked, maxMarked, radiusFactor, "domain-overlay-in", "domain-overlay-in-hp", function(elt, domain, domainIndex) {
+    markChosen(linksIndexes(domains[domainIndex].in), 1, heavyMarked, maxMarked, radiusFactor, "domain-overlay-in", "domain-overlay-in-hp", function(elt, domainName, domainIndex) {
         elt.onclick = function() {
-            markLinks(domain, domainIndex);
+            markLinks(domainName, domainIndex);
         }
     });
     /* Mark out-links */
-    markChosen(domains[domainIndex].out, 1 + domains[domainIndex].in.length, heavyMarked, maxMarked, radiusFactor, "domain-overlay-out", "domain-overlay-out-hp", function(elt, domain, domainIndex) {
+    markChosen(linksIndexes(domains[domainIndex].out), 1 + linksIndexes(domains[domainIndex].in).length, heavyMarked, maxMarked, radiusFactor, "domain-overlay-out", "domain-overlay-out-hp", function(elt, domainName, domainIndex) {
         elt.onclick = function() {
-            markLinks(domain, domainIndex);
+            markLinks(domainName, domainIndex);
         }
     });
+}
+
+/*
+{d:"391.org", x:-589.0432, y:-281.74088, r:5.0, in:"222(-589.385315,-193.555618~-604.705933,-255.864410);223(-591.702942,-188.440689~-606.290222,-254.769012)", out:""},
+*/
+function expandLinks(source, linksString, reverse) {
+    var tokens = linksString.split(";");
+    var links = [];
+    var sourceCoordinates = source.x + ',' + source.y;
+    var arrayLength = tokens.length;
+    for (var i = 0; i < arrayLength; i++) {
+        if (tokens[i].length == 0) {
+            continue;
+        }
+        /* 222(-589.385315,-193.555618~-604.705933,-255.864410) */
+        var subTokens = tokens[i].split("(")
+        var linkIndex = subTokens[0];
+        /* -589.385315,-193.555618~-604.705933,-255.864410) */
+        var infixCoordinates = subTokens[1].replace('~', ' ').replace(')', '');
+        var destCoordinates = domains[linkIndex].x + ',' + domains[linkIndex].y;
+        if (reverse) {
+            links.push("M " + destCoordinates + " C " + infixCoordinates + " " + sourceCoordinates);
+        } else {
+            links.push("M " + sourceCoordinates + " C " + infixCoordinates + " " + destCoordinates);
+        }
+    }
+    return links;
+}
+
+function linksIndexes(linksString) {
+    var tokens = linksString.split(";");
+    var indexes = [];
+    var arrayLength = tokens.length;
+    for (var i = 0; i < arrayLength; i++) {
+        if (tokens[i].length == 0) {
+            continue;
+        }
+        /* 222(-589.385315,-193.555618~-604.705933,-255.864410) */
+        indexes.push(tokens[i].split("(")[0]);
+    }
+    return indexes;
 }
 
 function markChosen(indexes, matched, heavyLimit, normalLimit, radiusFactor, heavyClass, normalClass, callback) {
@@ -70,7 +157,7 @@ function markChosen(indexes, matched, heavyLimit, normalLimit, radiusFactor, hea
         var elt = document.createElement("div");
         elt.id = "domain-overlay-" + matched;
         elt.className = matched > heavyLimit ? normalClass : heavyClass;
-        elt.setAttribute('title', domain.d + " (in=" + domain.in.length + ", out=" + domain.out.length + ")");
+        elt.setAttribute('title', domain.d + " (in=" + linksIndexes(domain.in).length + ", out=" + linksIndexes(domain.out).length + ")");
         elt.domain = domain.d;
         elt.domainIndex = indexes[i];
         if (callback) {
@@ -182,6 +269,11 @@ if (typeof myDragon != 'undefined') {
                 markLinks(d.d, i);
                 break;
             }
+            /* TODO: Avoid click-handling on drag then enable
+            if (diffusor) {
+                diffusor.style.opacity = 0.0;
+            }
+            */
         }
     });
 }

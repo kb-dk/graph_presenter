@@ -82,6 +82,15 @@ a:active 	{ color: #f00; }
     color: #32611F;
 }
 
+#svg-overlay {
+    
+}
+
+#diffusor-overlay {
+    background: white;
+    opacity: 0.0;
+}
+
 /* Used when there are too many matches for animation to be feasible */
 .domain-overlay-hp {
     border: 5px solid red;
