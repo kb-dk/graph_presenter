@@ -40,6 +40,10 @@ DZI="${B}.dzi"
 : ${RENDER_HEIGHT:="$RENDER_SIZE"}
 : ${FORMAT:="png"} # Gephi charts are circles, lines and text so PNG is probably best choice
 
+# sed performance tuning
+: ${SED_BATCH_SIZE:="5000"} # 5000 is an extremely loose guess. Adjust at will (200K blows up on a 16GB machine)
+: ${SED_THREADS:=$(nproc)}
+
 # Where to get OpenSeadragon
 : ${OSD_VERSION:=2.2.1}
 : ${OSD_ZIP:="openseadragon-bin-${OSD_VERSION}.zip"}
@@ -263,6 +267,51 @@ extract_coordinates_links() {
     cat "$DAT_CL"
 }
 
+# sed chokes with hundred of thousands of rules.
+# split_sed takes a file with rules and splits them into chunks
+# as well as chaining multiple seds for higher performance
+#
+# Batch size as well as thread size is set with SED_BATCH_SIZE and SED_THREADS
+#
+# input: input_file rule_file output_file
+split_sed() {
+    local FIN="$1"
+    local RULES="$2"
+    local FOUT="$3"
+
+    local SRC=$(mktemp)
+    cp "$FIN" "$SRC"
+    local T=$(mktemp)
+    local RULE_TMP=$(mktemp)
+    split -l $SED_BATCH_SIZE "$RULES" "${RULE_TMP}_"
+    local SEDS=""
+    local SED_COUNT=0
+    local EXE_COUNT=0
+    local TOTAL_RULES=$(wc -l < "$FIN")
+    while read -r RULE_FILE; do
+        SEDS="$SEDS | sed -f \"$RULE_FILE\""
+        SED_COUNT=$((SED_COUNT+1))
+        if [[ "$SED_COUNT" -eq "$SED_THREADS" ]]; then
+            EXE_COUNT=$((EXE_COUNT+1))
+            # TODO: Don't provide this feedback on stderr
+            >&2 echo "Activating $SED_THREADS seds @ $SED_BATCH_SIZE rules (out of $TOTAL_RULES total rules) number $EXE_COUNT at $(date +"%Y-%m-%d %H:%M")"
+            bash -c "cat \"$SRC\"$SEDS > \"$T\" ; mv \"$T\" \"$SRC\""
+            SEDS=""
+            SED_COUNT=0
+        fi
+    done <<< $(ls ${RULE_TMP}_*)
+    if [[ "$SED_COUNT" -ne "0" ]]; then
+        bash -c "cat \"$SRC\"$SEDS > \"$T\" ; mv \"$T\" \"$SRC\""
+    fi
+
+    mv "$SRC" "$FOUT"
+    
+    rm ${RULE_TMP} ${RULE_TMP}_*
+    if [[ -f "$T" ]]; then
+        rm "$T"
+    fi
+}
+
 # domain x y r in_links_indexes out_links_indexes
 extract_coordinates_links_index() {
     if [[ ! -s "$DAT_CL_INDEX" ]]; then
@@ -273,7 +322,8 @@ extract_coordinates_links_index() {
             echo "s/§${D}§/${INDEX}/g" >> "$T_SED"
             INDEX=$((INDEX+1))
         done <<< $(extract_coordinates_links)
-        sed -f "$T_SED" <<< $(extract_coordinates_links) > "$DAT_CL_INDEX"
+        split_sed "$DAT_CL" "$T_SED" "$DAT_CL_INDEX"
+#        sed -f "$T_SED" <<< $(extract_coordinates_links) > "$DAT_CL_INDEX"
         rm "$T_SED"
     fi
     cat "$DAT_CL_INDEX"
