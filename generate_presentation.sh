@@ -102,6 +102,10 @@ check_parameters() {
     if [[ "true" == "$MISSING" ]]; then
         usage 2
     fi
+    if [[ .$(which xmllint) == . ]]; then
+        >&2 echo "Error: 'xmllint' not available, please install it"
+        usage 3
+    fi
     SVG_ABSOLUTE=$(echo "$(cd "$(dirname "$SVG")"; pwd)/$(basename "$SVG")")
     PNG_ABSOLUTE=$(echo "$(cd "$(dirname "$PNG")"; pwd)/$(basename "$PNG")")
 }
