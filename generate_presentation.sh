@@ -41,8 +41,8 @@ DZI="${B}.dzi"
 : ${FORMAT:="png"} # Gephi charts are circles, lines and text so PNG is probably best choice
 
 # sed performance tuning
-: ${SED_BATCH_SIZE:="5000"} # 5000 is an extremely loose guess. Adjust at will (200K blows up on a 16GB machine)
-: ${SED_THREADS:=$(nproc)}
+: ${SED_BATCH_SIZE:="500"} # 500 was selected from a few ad hoc experiments. Increasing beyond 1000 slows overall processing
+: ${SED_THREADS:=$(nproc)} # Increasing this well (3x) beyond the number of physical cores has a positive effect (30-40%)
 
 # Where to get OpenSeadragon
 : ${OSD_VERSION:=2.2.1}
@@ -206,7 +206,7 @@ normalise_svg() {
 
 collapse() {
     local LAST="%%%"
-    while read -r PAIR; do
+    while IFS= read -r PAIR; do
         local TOKENS=($PAIR)
         local LEFT=${TOKENS[0]}
         local RIGHT=${TOKENS[1]}
@@ -288,7 +288,7 @@ split_sed() {
     local SED_COUNT=0
     local EXE_COUNT=0
     local TOTAL_RULES=$(wc -l < "$FIN")
-    while read -r RULE_FILE; do
+    while IFS=  read -r RULE_FILE; do
         SEDS="$SEDS | sed -f \"$RULE_FILE\""
         SED_COUNT=$((SED_COUNT+1))
         if [[ "$SED_COUNT" -eq "$SED_THREADS" ]]; then
@@ -299,7 +299,7 @@ split_sed() {
             SEDS=""
             SED_COUNT=0
         fi
-    done <<< $(ls ${RULE_TMP}_*)
+    done < <(ls ${RULE_TMP}_*)
     if [[ "$SED_COUNT" -ne "0" ]]; then
         bash -c "cat \"$SRC\"$SEDS > \"$T\" ; mv \"$T\" \"$SRC\""
     fi
@@ -317,11 +317,11 @@ extract_coordinates_links_index() {
     if [[ ! -s "$DAT_CL_INDEX" ]]; then
         local T_SED=$(mktemp)
         local INDEX=0
-        while read -r LINE; do
+        while IFS= read -r LINE; do
             local D=${LINE%% *}
             echo "s/§${D}§/${INDEX}/g" >> "$T_SED"
             INDEX=$((INDEX+1))
-        done <<< $(extract_coordinates_links)
+        done < <(extract_coordinates_links)
         split_sed "$DAT_CL" "$T_SED" "$DAT_CL_INDEX"
 #        sed -f "$T_SED" <<< $(extract_coordinates_links) > "$DAT_CL_INDEX"
         rm "$T_SED"
@@ -345,7 +345,7 @@ extract_domains() {
 
 extract_node_map() {
     echo "nodemap=["
-    while read -r LINE; do
+    while IFS= read -r LINE; do
         local D=${LINE%% *}
         echo "\"$D\"," 
     done < "${DEST}/all.dat"
