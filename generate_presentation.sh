@@ -494,6 +494,16 @@ extract_linked_mapping() {
     close_mapping
 }
 
+# Cloaded loader-div
+get_linked_footer() {
+    cat <<EOF
+var loader = document.getElementById("loader");
+if (loader) {
+    loader.parentNode.removeChild(loader);
+}
+EOF
+}
+
 create_linked_json() {
     if [[ -s "${DEST}/linked.js" ]]; then
         echo "- Skipping linked node data extraction as '${DEST}/linked.js' already exists"
@@ -504,6 +514,7 @@ create_linked_json() {
     extract_viewbox >> "${DEST}/linked.js"
 #    extract_domain_list >> "${DEST}/linked.js"
     extract_linked >> "${DEST}/linked.js"
+    get_linked_footer >> "${DEST}/linked.js"
 }
 
 copy_files() {
