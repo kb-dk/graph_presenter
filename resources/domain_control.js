@@ -28,6 +28,7 @@ function createSVGOverlay() {
 
 function updateSVGOverlay(svgXML) {
     svgString += svgXML;
+    
     svg.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;z-index:10;margin:0;padding:0;top:0;left:0;width:100%;height:100%" viewBox="' + viewbox.x1 + ' ' + viewbox.y1 + ' ' + viewbox.x2 + ' ' + viewbox.y2 + '">' + svgString + '</svg>';
     diffusor.style.opacity = 0.8;
 }
@@ -49,6 +50,13 @@ function getSVGCircle(domain, color) {
     return '<circle fill-opacity="1.0" fill="#' + color + '" r="' + domain.r + '" cx="' + domain.x + '" cy="' + domain.y + '" stroke="#000000" stroke-opacity="1.0" stroke-width="1.0"><title>' + domain.d + ' (in=' + linksIndexes(domain.in).length + ', out=' + linksIndexes(domain.out).length + ')</title></circle>\n';    
 }
 
+// TODO: Get text to align properly and get the right font size
+function getSVGText(domain) {
+    var fontsize = 12;
+    var fontName = 'Arial';
+    return '<text font-size="' + fontsize + '" x="' + domain.x + '" y="' + domain.y + '" style="pointer-events:none; text-anchor: middle; dominant-baseline: central;" font-family="' + fontName + '">' + domain.d + '</text>';
+}
+
 function getDomainColor(domain) {
     var links = domain.out.length == 0 ? domain.in : domain.out;
     if (links.length == 0) {
@@ -67,6 +75,7 @@ function drawCircles(links, counter, isInLinks) {
         // TODO: the color is a bit tricky as it depends on whether the node has outgoing only ingoing links
         var color = getDomainColor(external);
         svgCircles += getSVGCircle(external, color);
+        svgCircles += getSVGText(external);
     }
     updateSVGOverlay(svgCircles);
 }
@@ -91,6 +100,7 @@ function markLinks(domainName, domainIndex) {
     drawCircles(outLinks, outLinks.length*2+outLinks.length, false);
     /* Draw self-circle */
     updateSVGOverlay(getSVGCircle(domain, getDomainColor(domain)));
+    updateSVGOverlay(getSVGText(domain));
     
     /* Mark in-links */
 /*    markChosen(linksIndexes(domains[domainIndex].in), 1, heavyMarked, maxMarked, radiusFactor, "domain-overlay-mimick", "domain-overlay-mimick", function(elt, domainName, domainIndex) {
