@@ -2,7 +2,7 @@
 
 var heavyMarked = 150;  // Limit for heavy (animated) marking
 var maxMarked =  1000;  // Overall limit for marking
-var baseRadius =   10;  // TODO: Couple this to render size
+var baseRadius =   20;  // TODO: Couple this to render size
 var baseMargin =  200; // TODO: Should be coupled to zoom level
 
 var svg = null;
@@ -74,7 +74,7 @@ function drawCircles(links, counter, isInLinks) {
 function markLinks(domainName, domainIndex) {
     myDragon.clearOverlays(); // FIXME: Quite clumsy to freeze the OpenSeadragon instance this way
     if (document.getElementById("domain-selector")) {
-        document.getElementById("domain-selector").value = " " + domain + " ";
+        document.getElementById("domain-selector").value = " " + domainName + " ";
     }
     var worldW = myDragon.world.getItemAt(0).getContentSize().x;
     var radiusFactor = baseRadius/worldW;
@@ -327,11 +327,11 @@ if (typeof myDragon != 'undefined') {
                 markLinks(d.d, i);
                 break;
             }
-            /* TODO: Avoid click-handling on drag then enable
-            if (diffusor) {
-                diffusor.style.opacity = 0.0;
+            if (info.quick && diffusor) { // info.quick = not dragged
+                if (diffusor) {
+                    diffusor.style.opacity = 0.0;
+                }
             }
-            */
         }
     });
 }
