@@ -4,6 +4,7 @@ var heavyMarked = 150;  // Limit for heavy (animated) marking
 var maxMarked =  1000;  // Overall limit for marking
 var baseRadius =   20;  // TODO: Couple this to render size
 var baseMargin =  200; // TODO: Should be coupled to zoom level
+var strokeWidth = 2.0;
 
 var svg = null;
 var diffusor = null;
@@ -36,12 +37,12 @@ function clearSVGOverlay() {
 
 function updateSVGOverlay(svgXML) {
     svgString += svgXML;
-    
+
     svg.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;z-index:10;margin:0;padding:0;top:0;left:0;width:100%;height:100%" viewBox="' + viewbox.x1 + ' ' + viewbox.y1 + ' ' + viewbox.x2 + ' ' + viewbox.y2 + '">' + svgString + '</svg>';
     diffusor.style.opacity = 0.8;
 }
 
-function drawLinks(links, counter) {
+function drawLinks(links) {
     var svgLines = '';
     for (var i = 0 ; i < links.length ; i++) {
         var link = links[i];
@@ -49,7 +50,7 @@ function drawLinks(links, counter) {
               d="M -170.428101,133.646652 C -151.027847,138.653076 -129.437119,175.263123 -134.443542,194.663376"
               class="id_dukkehjem.dk id_poolforum.se" stroke-opacity="1.0"
               stroke="#ff5584"/>*/
-        svgLines += '<path fill="none" stroke-width="1.0" d="' + link.path + '" stroke-opacity="1.0" stroke="#' + link.color + '"><title>' + link.sourceName + '→' + link.destName + '</path>\n'
+        svgLines += '<path fill="none" stroke-width="' + strokeWidth + '" d="' + link.path + '" stroke-opacity="1.0" stroke="#' + link.color + '"><title>' + link.sourceName + '→' + link.destName + '</path>\n'
     }
     updateSVGOverlay(svgLines);
 }
@@ -73,7 +74,7 @@ function getDomainColor(domain) {
     return links.split(";")[0].split('#')[1].replace(')', '');
 }
 
-function drawCircles(links, counter, isInLinks) {
+function drawCircles(links, isInLinks) {
     var svgCircles = '';
     for (var i = 0 ; i < links.length ; i++) {
         var link = links[i];
@@ -86,24 +87,28 @@ function drawCircles(links, counter, isInLinks) {
     updateSVGOverlay(svgCircles);
 }
 
-function markLinks(domainName, domainIndex) {
-    myDragon.clearOverlays(); // FIXME: Quite clumsy to freeze the OpenSeadragon instance this way
+function markLinks(domainName, domainIndex, clearPrevious) {
+    if (clearPrevious) {
+        myDragon.clearOverlays();
+    }
     if (document.getElementById("domain-selector")) {
         document.getElementById("domain-selector").value = " " + domainName + " ";
     }
     var worldW = myDragon.world.getItemAt(0).getContentSize().x;
     var radiusFactor = baseRadius/worldW;
 
-    createSVGOverlay();
+    if (clearPrevious || diffusor == null) {
+        createSVGOverlay();
+    }
     var domain = domains[domainIndex];
     var inLinks = expandLinks(domain, domainIndex, domain.in, true);
     var outLinks = expandLinks(domain, domainIndex, domain.out, false);
     /* Draw link lines */
-    drawLinks(inLinks, 0);
-    drawLinks(outLinks, inLinks.length);
+    drawLinks(inLinks);
+    drawLinks(outLinks);
     /* Draw linked circles */
-    drawCircles(inLinks, inLinks.length+outLinks.length, true);
-    drawCircles(outLinks, outLinks.length*2+outLinks.length, false);
+    drawCircles(inLinks, true);
+    drawCircles(outLinks, false);
     /* Draw self-circle */
     updateSVGOverlay(getSVGCircle(domain, getDomainColor(domain)));
     updateSVGOverlay(getSVGText(domain));
@@ -283,7 +288,7 @@ function markMatching(domainInfix) {
     }
     var pm = markChosen(matchIndexes, 0, heavyMarked, maxMarked, radiusFactor, "domain-overlay", "domain-overlay-hp", function(elt, domain, domainIndex) {
         elt.onclick = function() {
-            markLinks(domain, domainIndex);
+            markLinks(domain, domainIndex, true);
         }
     });
     console.log("Matched " + matched + " nodes (max " + maxMarked + " marked) in " + (new Date().getTime() - startTime) + " ms");
@@ -345,10 +350,10 @@ if (typeof myDragon != 'undefined') {
             var d = domains[i];
             if (d.x-d.r <= gx && d.x+d.r >= gx &&
                 d.y-d.r <= gy && d.y+d.r >= gy) {
-                markLinks(d.d, i);
-                break;
+                markLinks(d.d, i, !info.shift);
+                return;
             }
-            clearSVGOverlay();
         }
+        clearSVGOverlay();
     });
 }
