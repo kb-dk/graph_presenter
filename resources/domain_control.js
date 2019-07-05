@@ -2,7 +2,7 @@
 
 var heavyMarked = 150;  // Limit for heavy (animated) marking
 var maxMarked =  1000;  // Overall limit for marking
-var baseRadius =   4;  // TODO: Couple this to render size
+var baseRadius =   10;  // TODO: Couple this to render size
 var baseMargin =  200; // TODO: Should be coupled to zoom level
 
 var svg = null;
@@ -40,11 +40,35 @@ function drawLinks(links, counter) {
               d="M -170.428101,133.646652 C -151.027847,138.653076 -129.437119,175.263123 -134.443542,194.663376"
               class="id_dukkehjem.dk id_poolforum.se" stroke-opacity="1.0"
               stroke="#ff5584"/>*/
-        //console.log("Adding line " + links[i]);
-        // '<circle cx="40" cy="40" r="40" stroke="red" stroke-width="4" fill="blue" />'
-        svgLines += '<path fill="none" stroke-width="1.0" d="' + link.path + '" stroke-opacity="1.0" stroke="#' + link.color + '"/>\n'
+        svgLines += '<path fill="none" stroke-width="1.0" d="' + link.path + '" stroke-opacity="1.0" stroke="#' + link.color + '"><title>' + link.sourceName + '→' + link.destName + '</path>\n'
     }
     updateSVGOverlay(svgLines);
+}
+
+function getSVGCircle(domain, color) {
+    return '<circle fill-opacity="1.0" fill="#' + color + '" r="' + domain.r + '" cx="' + domain.x + '" cy="' + domain.y + '" stroke="#000000" stroke-opacity="1.0" stroke-width="1.0"><title>' + domain.d + ' (in=' + linksIndexes(domain.in).length + ', out=' + linksIndexes(domain.out).length + ')</title></circle>\n';    
+}
+
+function getDomainColor(domain) {
+    var links = domain.out.length == 0 ? domain.in : domain.out;
+    if (links.length == 0) {
+        console.log("No links");
+        return "cccccc";
+    }
+    /* 222(-589.385315,-193.555618~-604.705933,-255.864410#c0c0c0);123... */
+    return links.split(";")[0].split('#')[1].replace(')', '');
+}
+
+function drawCircles(links, counter, isInLinks) {
+    var svgCircles = '';
+    for (var i = 0 ; i < links.length ; i++) {
+        var link = links[i];
+        var external = isInLinks ? domains[link.sourceIndex] : domains[link.destIndex];
+        // TODO: the color is a bit tricky as it depends on whether the node has outgoing only ingoing links
+        var color = getDomainColor(external);
+        svgCircles += getSVGCircle(external, color);
+    }
+    updateSVGOverlay(svgCircles);
 }
 
 function markLinks(domainName, domainIndex) {
@@ -57,28 +81,37 @@ function markLinks(domainName, domainIndex) {
 
     createSVGOverlay();
     var domain = domains[domainIndex];
-    drawLinks(expandLinks(domain, domain.in, true), 0);
-    drawLinks(expandLinks(domain, domain.out, false), linksIndexes(domain.in).length);
-    /* Mark self */
-    markChosen([domainIndex], 0, heavyMarked, maxMarked, radiusFactor, "domain-overlay", "domain-overlay-hp");
+    var inLinks = expandLinks(domain, domainIndex, domain.in, true);
+    var outLinks = expandLinks(domain, domainIndex, domain.out, false);
+    /* Draw link lines */
+    drawLinks(inLinks, 0);
+    drawLinks(outLinks, inLinks.length);
+    /* Draw linked circles */
+    drawCircles(inLinks, inLinks.length+outLinks.length, true);
+    drawCircles(outLinks, outLinks.length*2+outLinks.length, false);
+    /* Draw self-circle */
+    updateSVGOverlay(getSVGCircle(domain, getDomainColor(domain)));
+    
     /* Mark in-links */
-    markChosen(linksIndexes(domains[domainIndex].in), 1, heavyMarked, maxMarked, radiusFactor, "domain-overlay-mimick", "domain-overlay-mimick", function(elt, domainName, domainIndex) {
+/*    markChosen(linksIndexes(domains[domainIndex].in), 1, heavyMarked, maxMarked, radiusFactor, "domain-overlay-mimick", "domain-overlay-mimick", function(elt, domainName, domainIndex) {
         elt.onclick = function() {
             markLinks(domainName, domainIndex);
         }
-    });
+    });*/
     /* Mark out-links */
-    markChosen(linksIndexes(domains[domainIndex].out), 1 + linksIndexes(domains[domainIndex].in).length, heavyMarked, maxMarked, radiusFactor, "domain-overlay-mimick", "domain-overlay-mimick", function(elt, domainName, domainIndex) {
+/*    markChosen(linksIndexes(domains[domainIndex].out), 1 + linksIndexes(domains[domainIndex].in).length, heavyMarked, maxMarked, radiusFactor, "domain-overlay-mimick", "domain-overlay-mimick", function(elt, domainName, domainIndex) {
         elt.onclick = function() {
             markLinks(domainName, domainIndex);
         }
-    });
+    });*/
+    /* Mark self */
+//    markChosen([domainIndex], 0, heavyMarked, maxMarked, radiusFactor, "domain-overlay", "domain-overlay-hp");
 }
 
 /*
 {d:"391.org", x:-589.0432, y:-281.74088, r:5.0, in:"222(-589.385315,-193.555618~-604.705933,-255.864410);223(-591.702942,-188.440689~-606.290222,-254.769012)", out:""},
 */
-function expandLinks(source, linksString, reverse) {
+function expandLinks(source, sourceIndex, linksString, reverse) {
     var tokens = linksString.split(";");
     var links = [];
     var sourceCoordinates = source.x + ',' + source.y;
@@ -95,11 +128,30 @@ function expandLinks(source, linksString, reverse) {
         var infixCoordinates = coorCol[0].replace('~', ' ');
         var color = coorCol[1].replace(')', '');
         var destCoordinates = domains[linkIndex].x + ',' + domains[linkIndex].y;
+
+        var sIndex, dIndex;
+        var sCoor, dCoor;
+        var sName, dName;
+        var sRadius, dRadius;
+            
         if (reverse) {
-            links.push({path:"M " + destCoordinates + " C " + infixCoordinates + " " + sourceCoordinates, color: color});
+            sIndex = linkIndex;
+            dIndex = sourceIndex;
+            sCoor = destCoordinates;
+            dCoor = sourceCoordinates;
+            sName = domains[dIndex].d;
+            dName = source.d;
         } else {
-            links.push({path:"M " + sourceCoordinates + " C " + infixCoordinates + " " + destCoordinates, color: color});
+            sIndex = sourceIndex;
+            dIndex = linkIndex; 
+            sCoor = sourceCoordinates;
+            dCoor = destCoordinates;
+            sName = source.d;
+            dName = domains[sIndex].d;
+            sRadius = source.r;
+            dRadius = domains[dIndex].r;
         }
+        links.push({sourceName: sName, destName: dName, sourceIndex: sIndex, destIndex: dIndex, sourceRadius: sRadius, destRadius: dRadius, path: "M " + sCoor + " C " + infixCoordinates + " " + dCoor, color: color});
     }
     return links;
 }
@@ -118,6 +170,9 @@ function linksIndexes(linksString) {
     return indexes;
 }
 
+/*
+Visually marks the domains for all given indexes.
+*/
 function markChosen(indexes, matched, heavyLimit, normalLimit, radiusFactor, heavyClass, normalClass, callback) {
     var minX = 1;
     var maxX = 0;
@@ -155,7 +210,6 @@ function markChosen(indexes, matched, heavyLimit, normalLimit, radiusFactor, hea
         if (ry > maxY) {
             maxY = ry;
         }
-        
         var elt = document.createElement("div");
         elt.id = "domain-overlay-" + matched;
         elt.className = matched > heavyLimit ? normalClass : heavyClass;
@@ -175,6 +229,9 @@ function markChosen(indexes, matched, heavyLimit, normalLimit, radiusFactor, hea
     return {"minX": minX, "maxX": maxX, "minY": minY, "maxY": maxY, "matched": matched}
 }
 
+/*
+Performs a sequential search through all domains, visually marking the ones that has the given domainInfix
+*/
 function markMatching(domainInfix) {
     myDragon.clearOverlays(); // FIXME: Quite clumsy to freeze the OpenSeadragon instance this way
     if (domainInfix.length < 1) {
@@ -258,7 +315,6 @@ if (typeof myDragon == 'undefined') {
     }
 }
 if (typeof myDragon != 'undefined') {
-    console.log("Activating click handler");
     myDragon.addHandler('canvas-click', function(info) {
         var relative = myDragon.viewport.pointFromPixel(info.position);
         var gx = relative.x*viewbox.x2 + viewbox.x1;
