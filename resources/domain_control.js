@@ -334,6 +334,9 @@ if (typeof myDragon == 'undefined') {
 }
 if (typeof myDragon != 'undefined') {
     myDragon.addHandler('canvas-click', function(info) {
+        if (!info.quick) { // info.quick = not dragged
+            return;
+        }
         var relative = myDragon.viewport.pointFromPixel(info.position);
         var gx = relative.x*viewbox.x2 + viewbox.x1;
         var gy = relative.y*viewbox.x2 + viewbox.y1;
@@ -345,11 +348,7 @@ if (typeof myDragon != 'undefined') {
                 markLinks(d.d, i);
                 break;
             }
-            if (info.quick && diffusor) { // info.quick = not dragged
-                if (diffusor) {
-                    clearSVGOverlay();
-                }
-            }
+            clearSVGOverlay();
         }
     });
 }
