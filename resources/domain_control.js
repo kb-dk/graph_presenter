@@ -26,6 +26,14 @@ function createSVGOverlay() {
     svgString = '';
 }
 
+function clearSVGOverlay() {
+    if (diffusor) {
+        svgString = '';
+        updateSVGOverlay('');
+        diffusor.style.opacity = 0.0;
+    }
+}
+
 function updateSVGOverlay(svgXML) {
     svgString += svgXML;
     
@@ -52,9 +60,7 @@ function getSVGCircle(domain, color) {
 
 // TODO: Get text to align properly and get the right font size
 function getSVGText(domain) {
-    var fontsize = 12;
-    var fontName = 'Arial';
-    return '<text font-size="' + fontsize + '" x="' + domain.x + '" y="' + domain.y + '" style="pointer-events:none; text-anchor: middle; dominant-baseline: central;" font-family="' + fontName + '">' + domain.d + '</text>';
+    return '<text font-size="' + domain.fs + '" x="' + domain.x + '" y="' + domain.y + '" style="pointer-events:none; text-anchor: middle; dominant-baseline: central;" font-family="' + textfont + '">' + domain.d + '</text>';
 }
 
 function getDomainColor(domain) {
@@ -341,7 +347,7 @@ if (typeof myDragon != 'undefined') {
             }
             if (info.quick && diffusor) { // info.quick = not dragged
                 if (diffusor) {
-                    diffusor.style.opacity = 0.0;
+                    clearSVGOverlay();
                 }
             }
         }
