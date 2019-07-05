@@ -155,7 +155,7 @@ function expandLinks(source, sourceIndex, linksString, reverse) {
             dIndex = sourceIndex;
             sCoor = destCoordinates;
             dCoor = sourceCoordinates;
-            sName = domains[dIndex].d;
+            sName = domains[linkIndex].d;
             dName = source.d;
             sRadius = domains[dIndex].r;
             dRadius = source.r;
