@@ -24,7 +24,9 @@
     <script type="text/javascript">
         var myDragon = OpenSeadragon({
         id:            "zoom-display",
-        
+
+        gestureSettingsTouch : {clickToZoom: false, dblClickToZoom: true},
+        gestureSettingsMouse: {clickToZoom: false, dblClickToZoom: true},
         zoomPerScroll: 2.0,
         showNavigator:  false,
         wrapHorizontal: false,
