@@ -26,7 +26,7 @@ a:active 	{ color: #f00; }
     position: absolute;
     width: 100%;
     height: 5em;
-    z-index: 1;
+    z-index: 200;
     top: 30px;
     padding: 0 1em 0 1em;
 }
@@ -80,10 +80,11 @@ a:active 	{ color: #f00; }
 }
 #searchbox, #collapsor {
     color: #32611F;
+    z-index: 100;
 }
 
 #svg-overlay {
-    
+
 }
 
 #diffusor-overlay {
