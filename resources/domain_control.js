@@ -5,6 +5,11 @@ var maxMarked =  1000;  // Overall limit for marking
 var baseRadius =   20;  // TODO: Couple this to render size
 var baseMargin =  200; // TODO: Should be coupled to zoom level
 var strokeWidth = 2.0;
+// Which links to consider when calculating shortest path between two nodes
+var defaultVisitIn = false;
+var defaultVisitOut = true;
+// Which nodes to ignore when calculating shortest path
+var illegalNodesForShortestPath = ["google.com", "google.dk", "facebook.com", "bing.com", "twitter.com"];
 
 var svg = null;
 var diffusor = null;
@@ -32,6 +37,8 @@ function clearSVGOverlay() {
         svgString = '';
         updateSVGOverlay('');
         diffusor.style.opacity = 0.0;
+    } else {
+        createSVGOverlay();
     }
 }
 
@@ -56,6 +63,9 @@ function drawLinks(links) {
 }
 
 function getSVGCircle(domain, color) {
+    if (!color) {
+        color = getDomainColor(domain);
+    }
     return '<circle fill-opacity="1.0" fill="#' + color + '" r="' + domain.r + '" cx="' + domain.x + '" cy="' + domain.y + '" stroke="#000000" stroke-opacity="1.0" stroke-width="1.0"><title>' + domain.d + ' (in=' + linksIndexes(domain.in).length + ', out=' + linksIndexes(domain.out).length + ')</title></circle>\n';    
 }
 
@@ -179,6 +189,11 @@ function expandLinks(source, sourceIndex, linksString, reverse) {
     return links;
 }
 
+function expandAllLinks(index) {
+    var node = domains[index];
+    return expandLinks(node, index, node.out, false).concat(expandLinks(node, index, node.in, true));
+}    
+
 function linksIndexes(linksString) {
     var tokens = linksString.split(";");
     var indexes = [];
@@ -252,6 +267,31 @@ function markChosen(indexes, matched, heavyLimit, normalLimit, radiusFactor, hea
     return {"minX": minX, "maxX": maxX, "minY": minY, "maxY": maxY, "matched": matched}
 }
 
+function getLinkBetween(sourceIndex, destIndex) {
+    var links = expandAllLinks(sourceIndex);
+    for (var i = 0 ; i < links.length ; i++) {
+        if (links[i].destIndex == destIndex || links[i].sourceIndex == destIndex) {
+            return [links[i]];
+        }
+    }
+    return [];
+}
+
+/*
+Given an array of indexes, mark all nodex and the immediate paths between subsequent nodes
+*/
+function markPath(nodeIndexes) {
+    clearSVGOverlay();
+    for (var i = 0 ; i < nodeIndexes.length ; i++) {
+        var node = domains[nodeIndexes[i]];
+        updateSVGOverlay(getSVGCircle(node));
+        if (i < nodeIndexes.length-1) {
+            drawLinks(getLinkBetween(nodeIndexes[i], nodeIndexes[i+1]));
+        }
+    }
+//        console.log(path[i] + ": " + domains[path[i]].d);
+}
+
 /*
 Performs a sequential search through all domains, visually marking the ones that has the given domainInfix
 */
@@ -308,6 +348,155 @@ function markMatching(domainInfix) {
     }
 }
 
+function getShortest(unvisited) {
+    var min = Infinity;
+    var entryKey = null;
+    for (var [key, value] of unvisited.entries()) {
+        if (value.dist < min) {
+            min = value.dist;
+            entryKey = key;
+        }
+    }
+    return entryKey;
+}
+
+function traverse(visited, unvisited, destIndex, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
+    var sourceIndex = getShortest(unvisited);
+//    console.log("Checking shortest: " + sourceIndex + ": " + domains[sourceIndex].d);
+    if (sourceIndex == null) {
+        return "EON"; // No more nodes
+    }
+    
+    var sourceValue = unvisited.get(sourceIndex);
+    var path = updateUnvisitedLinks(visited, unvisited, sourceIndex, destIndex, sourceValue.dist, sourceValue.path, visitIn, visitOut);
+    // https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm#Algorithm step 4
+    visited.add(sourceIndex);
+    unvisited.delete(sourceIndex);
+    return path ? path : "";
+}
+
+// https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm#Algorithm step 3
+// Returns path if the destination node has been reached
+function updateUnvisitedLinks(visited, unvisited, sourceIndex, destIndex, sourceDist, sourcePath, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
+    var links = [];
+    if (visitIn) {
+        links = links.concat(linksIndexes(domains[sourceIndex].in));
+    }
+    if (visitOut) {
+        links = links.concat(linksIndexes(domains[sourceIndex].out));
+    }
+    for (var i = 0 ; i < links.length ; i++) {
+        var nodeIndex = links[i];
+        console.log("Examining " + nodeIndex + " with type " + typeof nodeIndex);
+        
+        if (visited.has(Number(nodeIndex))) { // nodeIndex is a string and type matters for Set
+            continue;
+        }
+        var n = unvisited.get(nodeIndex);
+        if (n && n.dist <= sourceDist+1) {
+            continue
+        }
+        var nPath = sourcePath.length == 0 ? [] : sourcePath.slice(0);
+        nPath.push(nodeIndex);
+        if (nodeIndex == destIndex) {
+            return nPath;
+        }
+        unvisited.set(nodeIndex, {dist: sourceDist+1, path: nPath});
+    }
+    return undefined;
+}
+
+/*
+Returns indexes for illegalNodesForShortestPath, ensuring that they don't appear in the path
+*/
+var initialIllegalVisits = null;
+function getIllegalVisits() {
+    if (initialIllegalVisits == null) {
+        var remove = illegalNodesForShortestPath.slice(0);
+        initialIllegalVisits = new Set();
+        for (var j = 0 ; j < domains.length ; j++) {
+            var nodeName = domains[j].d;
+            for (var i = 0 ; i < remove.length ; i++) {
+                if (nodeName == remove[i]) {
+//                    console.log("Removing " + nodeName + " with index " + j);
+                    initialIllegalVisits.add(j);
+                    remove.splice(i, 1);
+                    if (remove.length == 0) {
+                        return new Set(initialIllegalVisits);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    return new Set(initialIllegalVisits);
+}
+
+/*
+Finds the shortest path between two nodes, using Dijkstra's algorithm O(n^2)
+While O(n^2) sounds problematic, only insanely interlinked graphs should take a long time and a lot of memory
+Note: illegalNodesForShortestPath holds a list of domains to ignore when doing traversal: It is not very 
+      interesting to see that a & b are connected by linking to google.com
+*/
+function findShortestPath(sourceIndex, destIndex, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
+    var visited = getIllegalVisits();
+    visited.delete(sourceIndex);
+    visited.delete(destIndex);
+    var unvisited = new Map();
+    var path;
+    if (sourceIndex == destIndex) {
+        console.log("Source == dest");
+        return;
+    }
+    
+    unvisited.set(sourceIndex, {dist: 0, path: [sourceIndex]});
+    path = updateUnvisitedLinks(visited, unvisited, sourceIndex, destIndex, 0, [sourceIndex], visitIn, visitOut);
+    if (path) {
+        return path == "EON" ? undefined : path;
+    }
+
+    while ((path = traverse(visited, unvisited, destIndex, visitIn, visitOut)) == "");
+    return !path || path == "EON" ? undefined : path;
+}
+
+function markShortestPath(sourceName, destName) {
+    sourceName = sourceName.trim();
+    destName = destName.trim();
+    var sourceIndex = -1;
+    var destIndex = -1;
+    var arrayLength = domains.length;
+    for (var i = 0; i < arrayLength; i++) {
+        var domainName = domains[i].d;
+        if (domainName == sourceName) {
+            sourceIndex = i;
+            if (destIndex != -1) {
+                break;
+            }
+        }
+        if (domainName == destName) {
+            destIndex = i;
+            if (sourceIndex != -1) {
+                break;
+            }
+        }
+    }
+    if (sourceIndex == -1 || destIndex == -1) {
+        console.log("markShortestPath: Unable to locate source('" + sourceName + "') and/or destination ('" + destName + "')");
+        return
+    }
+    var path = findShortestPath(sourceIndex, destIndex, true, true);
+    if (path) {
+        var s = domains[path[0]].d;
+        for (var i = 1 ; i < path.length ; i++) {
+            s +=" ↔ " + domains[path[i]].d;
+        }
+        console.log("Shortest path: " + s);
+        markPath(path);
+    } else {
+        console.log("Unable to find path from '" + sourceName + "' to '" + destName + "'");
+    }
+}
+
 var animationCallback = null;
 var domainChanged = function(e) {
     if (animationCallback != null) {
@@ -316,6 +505,16 @@ var domainChanged = function(e) {
     var domainInput = e.target.value.toLowerCase();
     animationCallback = window.requestAnimationFrame(function(timestamp) {
         markMatching(domainInput);
+    });
+}
+var domainToChanged = function(e) {
+    if (animationCallback != null) {
+        window.cancelAnimationFrame(animationCallback);
+    }
+    var domainInput = document.getElementById("domain-selector").value;
+    var domainToInput = e.target.value.toLowerCase();
+    animationCallback = window.requestAnimationFrame(function(timestamp) {
+        markShortestPath(domainInput, domainToInput);
     });
 }
 
@@ -329,6 +528,9 @@ if (typeof myDragon == 'undefined') {
         document.getElementById("domain-selector").addEventListener("input", domainChanged);
     } else {
         console.log("Warning: Unable to locate an input field with id 'domain-selector': Domain selection is disabled");
+    }
+    if (document.getElementById("domain-selector-to")) {
+        document.getElementById("domain-selector-to").addEventListener("input", domainToChanged);
     }
     if (document.getElementById("domain-feedback")) {
         var domainFeedback = document.getElementById("domain-feedback");
