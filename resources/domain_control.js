@@ -447,7 +447,7 @@ function findShortestPath(sourceIndex, destIndex, visitIn=defaultVisitIn, visitO
     var unvisited = new Map();
     var path;
     if (sourceIndex == destIndex) {
-        console.log("Source == dest");
+        console.log("Source == destination");
         return;
     }
     
@@ -468,7 +468,6 @@ function message(m) {
 
 function isNodeIndexInLinks(linksString, nodeIndex) {
     var li = linksIndexes(linksString);
-    console.log("Locating " + nodeIndex + " in " + li);
     for (var i = 0 ; i < li.length ; i++) {
         if (li[i] == nodeIndex) {
             return true;
@@ -575,9 +574,11 @@ var searchTypeChanged = function(e) {
     switch (searchType) {
     case "search":
         domainSelectorToInput.style.visibility = 'hidden';
+        domainChanged();
         break
     case "connect": 
         domainSelectorToInput.style.visibility = 'visible';
+        domainToChanged();
        break
     default:
         console.log("Error: Unknown search type '" + searchType + "'");
