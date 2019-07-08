@@ -517,6 +517,13 @@ create_linked_json() {
     get_linked_footer >> "${DEST}/linked.js"
 }
 
+# A JSON without links-information
+create_alternative_jsons() {
+    cp "${DEST}/linked.js" "${DEST}/linked_full.js"
+    sed 's/\(^{d:[^}]*\), in:[^}]*, out:[^}]*}/\1}/' < "${DEST}/linked.js" > "${DEST}/simple.js"
+    sed 's/([0-9.,~-]\+#[a-f0-9]\+)//g'  < "${DEST}/linked.js" > "${DEST}/linked_no_lines.js"
+}
+
 copy_files() {
     echo "- Copying files and applying template $TEMPLATE to $DEST"
     if [[ ! -d "$DEST/resources" ]]; then
@@ -556,6 +563,7 @@ if [[ "true" == "$RENDER_META" ]]; then
     fetch_dragon
 #    extract_all_json
     create_linked_json
+    create_alternative_jsons
     copy_files
 else
     echo "- Skipping rendering of metadata (nodes.js, index.html and supporting files)"

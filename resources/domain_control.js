@@ -84,7 +84,8 @@ function getDomainColor(domain) {
         return "cccccc";
     }
     /* 222(-589.385315,-193.555618~-604.705933,-255.864410#c0c0c0);123... */
-    return links.split(";")[0].split('#')[1].replace(')', '');
+    var tokens = links.split(";")[0].split('#');
+    return tokens.length > 1 ? tokens[1].replace(')', '') : "cccccc";
 }
 
 function drawCircles(links, isInLinks) {
@@ -158,11 +159,15 @@ function expandLinks(source, sourceIndex, linksString, reverse) {
         var subTokens = tokens[i].split("(")
         var linkIndex = subTokens[0];
         /* -589.385315,-193.555618~-604.705933,-255.864410#c0c0c0) */
-        var coorCol = subTokens[1].split('#');
-        var infixCoordinates = coorCol[0].replace('~', ' ');
-        var color = coorCol[1].replace(')', '');
+        if (subTokens[1]) {
+            var coorCol = subTokens[1].split('#');
+            var infixCoordinates = coorCol[0].replace('~', ' ');
+            var color = coorCol[1].replace(')', '');
+        } else { // No edge visuals
+            var color = "cccccc";
+        }
+            
         var destCoordinates = domains[linkIndex].x + ',' + domains[linkIndex].y;
-
         var sIndex, dIndex;
         var sCoor, dCoor;
         var sName, dName;
@@ -187,7 +192,7 @@ function expandLinks(source, sourceIndex, linksString, reverse) {
             sRadius = source.r;
             dRadius = domains[dIndex].r;
         }
-        links.push({sourceName: sName, destName: dName, sourceIndex: sIndex, destIndex: dIndex, sourceRadius: sRadius, destRadius: dRadius, path: "M " + sCoor + " C " + infixCoordinates + " " + dCoor, color: color});
+        links.push({sourceName: sName, destName: dName, sourceIndex: sIndex, destIndex: dIndex, sourceRadius: sRadius, destRadius: dRadius, path: infixCoordinates ? "M " + sCoor + " C " + infixCoordinates + " " + dCoor : null, color: color});
     }
     return links;
 }
