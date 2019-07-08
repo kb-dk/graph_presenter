@@ -15,8 +15,12 @@
             <h1>Graph for ${DEST}</h1>
         </div>
         <div id="searchbox">
-            Search: <input type="text" id="domain-selector"/>
-            <!-- <input type="text" id="domain-selector-to"/> highly experimental -->
+            <select name="search-type" id="search-type">
+                <option value="search">Search</option>
+                <option value="connect">Connect</option>
+            </select>
+            <input type="text" placeholder="domain" id="domain-selector" title="Click a domain-circle to fill" />
+            <input type="text" placeholder="destination" id="domain-selector-to" title="Shift-click a domain circle to fill" style="visibility: hidden"/>
             <span id="domain-feedback">&nbsp;</span>
         </div>
     </div>

@@ -108,6 +108,12 @@ a:active 	{ color: #f00; }
     opacity: 0.0;
 }
 
+#domain-feedback {
+    background: white;
+    padding: 0.1em 0.1em 0.1em 0.1em;
+    opacity: 0.9;
+}
+
 /* Used when there are too many matches for animation to be feasible */
 .domain-overlay-hp {
     border: 5px solid red;

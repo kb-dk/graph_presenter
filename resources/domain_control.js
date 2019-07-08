@@ -9,7 +9,10 @@ var strokeWidth = 2.0;
 var defaultVisitIn = false;
 var defaultVisitOut = true;
 // Which nodes to ignore when calculating shortest path
-var illegalNodesForShortestPath = ["google.com", "google.dk", "facebook.com", "bing.com", "twitter.com"];
+var illegalNodesForShortestPath = ["google.com", "google.dk", "facebook.com", "bing.com", "twitter.com", "wikipedia.dk", "wikipedia.org", "wordpress.com"];
+
+// The search mode. Valid values: 'search' and 'connect'
+var searchType = 'search';
 
 var svg = null;
 var diffusor = null;
@@ -299,7 +302,7 @@ function markMatching(domainInfix) {
     myDragon.clearOverlays(); // FIXME: Quite clumsy to freeze the OpenSeadragon instance this way
     if (domainInfix.length < 1) {
         myDragon.viewport.fitHorizontally().fitVertically();
-        domainFeedback.innerHTML = "&nbsp;";
+        domainFeedback.innerHTML = "";
         return;
     }
 
@@ -362,7 +365,7 @@ function getShortest(unvisited) {
 
 function traverse(visited, unvisited, destIndex, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
     var sourceIndex = getShortest(unvisited);
-//    console.log("Checking shortest: " + sourceIndex + ": " + domains[sourceIndex].d);
+//    console.log("Traversing with visited=" + visited.size + ", unvisited=" + unvisited.size + ", shortest=" + sourceIndex);
     if (sourceIndex == null) {
         return "EON"; // No more nodes
     }
@@ -386,10 +389,9 @@ function updateUnvisitedLinks(visited, unvisited, sourceIndex, destIndex, source
         links = links.concat(linksIndexes(domains[sourceIndex].out));
     }
     for (var i = 0 ; i < links.length ; i++) {
-        var nodeIndex = links[i];
-        console.log("Examining " + nodeIndex + " with type " + typeof nodeIndex);
+        var nodeIndex = Number(links[i]); // nodeIndex is a string and type matters for Set & map
         
-        if (visited.has(Number(nodeIndex))) { // nodeIndex is a string and type matters for Set
+        if (visited.has(nodeIndex)) { 
             continue;
         }
         var n = unvisited.get(nodeIndex);
@@ -459,9 +461,28 @@ function findShortestPath(sourceIndex, destIndex, visitIn=defaultVisitIn, visitO
     return !path || path == "EON" ? undefined : path;
 }
 
+function message(m) {
+    console.log(m);
+    domainFeedback.innerHTML = m;
+}
+
+function pathToText(path) {
+    var s = domains[path[0]].d;
+    for (var i = 1 ; i < path.length ; i++) {
+        // TODO: Make the arrows indicate the link direction
+        s +=" ↔ " + domains[path[i]].d;
+    }
+    return s;
+}
+
 function markShortestPath(sourceName, destName) {
+    myDragon.clearOverlays();
+    clearSVGOverlay();
+    createSVGOverlay();
+    
     sourceName = sourceName.trim();
     destName = destName.trim();
+    // TODO: If there is no destination, just mark the source node without links
     var sourceIndex = -1;
     var destIndex = -1;
     var arrayLength = domains.length;
@@ -480,20 +501,28 @@ function markShortestPath(sourceName, destName) {
             }
         }
     }
-    if (sourceIndex == -1 || destIndex == -1) {
-        console.log("markShortestPath: Unable to locate source('" + sourceName + "') and/or destination ('" + destName + "')");
-        return
+    if (sourceIndex != -1) {
+        updateSVGOverlay(getSVGCircle(domains[sourceIndex]));
     }
+    if (destIndex != -1) {
+        updateSVGOverlay(getSVGCircle(domains[destIndex]));
+    }
+    if (sourceIndex == -1 && destIndex == -1) {
+        message("Unable to locate '" + sourceName + "' and '" + destName + "'");
+        return
+    } else if (sourceIndex == -1) {
+        message("Unable to locate source '" + sourceName + "'");
+        return
+    } else if (destIndex == -1) {
+        message("Unable to locate destination '" + destName + "'");
+        return
+    }        
     var path = findShortestPath(sourceIndex, destIndex, true, true);
     if (path) {
-        var s = domains[path[0]].d;
-        for (var i = 1 ; i < path.length ; i++) {
-            s +=" ↔ " + domains[path[i]].d;
-        }
-        console.log("Shortest path: " + s);
+        message("Shortest path: " + pathToText(path));
         markPath(path);
     } else {
-        console.log("Unable to find path from '" + sourceName + "' to '" + destName + "'");
+        message("Unable to find path from '" + sourceName + "' to '" + destName + "'");
     }
 }
 
@@ -502,35 +531,115 @@ var domainChanged = function(e) {
     if (animationCallback != null) {
         window.cancelAnimationFrame(animationCallback);
     }
-    var domainInput = e.target.value.toLowerCase();
+    var domainInput = domainSelectorInput.value.toLowerCase();
     animationCallback = window.requestAnimationFrame(function(timestamp) {
-        markMatching(domainInput);
+        switch (searchType) {
+        case "search":
+            markMatching(domainInput);
+            break;
+        case "connect":
+            var domainToInput = domainSelectorToInput.value.toLowerCase();
+            markShortestPath(domainInput, domainToInput);
+            break;
+        }
     });
 }
 var domainToChanged = function(e) {
     if (animationCallback != null) {
         window.cancelAnimationFrame(animationCallback);
     }
-    var domainInput = document.getElementById("domain-selector").value;
-    var domainToInput = e.target.value.toLowerCase();
+    var domainInput = domainSelectorInput.value.toLowerCase();
+    var domainToInput = domainSelectorToInput.value.toLowerCase();
+    message("Finding shortest path from '" + domainInput + "' to '" + domainToInput + "'...");
     animationCallback = window.requestAnimationFrame(function(timestamp) {
         markShortestPath(domainInput, domainToInput);
     });
 }
+
+var searchTypeChanged = function(e) {
+    searchType = document.getElementById("search-type").value;
+    switch (searchType) {
+    case "search":
+        domainSelectorToInput.style.visibility = 'hidden';
+        break
+    case "connect": 
+        domainSelectorToInput.style.visibility = 'visible';
+       break
+    default:
+        console.log("Error: Unknown search type '" + searchType + "'");
+    }
+    
+}
+
+function clickedNode(domain, domainIndex, shift) {
+    switch (searchType) {
+    case "search":
+        markLinks(domain.d, domainIndex, false);
+        break;
+    case "connect":
+        if (!shift) {
+            domainSelectorInput.value = ' ' + domain.d + ' ';
+        } else {
+            domainSelectorToInput.value = ' ' + domain.d + ' ';
+        }
+        domainToChanged();
+        break;
+    }
+}
+
+function clickedOutsideNodes(shift) {
+    if (!shift) {
+        clearSVGOverlay();
+    }
+}
+
+var canvasClicked = function(info) {
+    if (!info.quick) { // info.quick = not dragged
+        return;
+    }
+    var relative = myDragon.viewport.pointFromPixel(info.position);
+    var gx = relative.x*viewbox.x2 + viewbox.x1;
+    var gy = relative.y*viewbox.x2 + viewbox.y1;
+    var arrayLength = domains.length; // domains is defined in domains.js
+    for (var i = 0; i < arrayLength; i++) {
+        var d = domains[i];
+        if (d.x-d.r <= gx && d.x+d.r >= gx &&
+            d.y-d.r <= gy && d.y+d.r >= gy) {
+            clickedNode(d, i, info.shift);
+            //markLinks(d.d, i, !info.shift);
+            return;
+        }
+    }
+    clickedOutsideNodes(info.shift);
+}
+
+var domainSelectorInput = document.getElementById("domain-selector");
+var domainSelectorToInput = document.getElementById("domain-selector-to");
+var searchTypeSelect = document.getElementById("search-type");
 
 if (typeof myDragon == 'undefined') {
     console.error("Error: The variable 'myDragon' is not set. Unable to provide visual domain marking");
 } else if (typeof domains == 'undefined') {
     console.error("Error: The variable 'domains' is not set. Unable to provide domain search");
 } else {
-    /* TODO: Consider a delay mechanism to make it smooth to type */
-    if (document.getElementById("domain-selector")) {
-        document.getElementById("domain-selector").addEventListener("input", domainChanged);
+    myDragon.addHandler('canvas-click', canvasClicked);
+    if (searchTypeSelect) {
+        searchTypeSelect.selectedIndex = 0;
+        searchTypeSelect.addEventListener("input", searchTypeChanged);
     } else {
+        searchTypeSelect = new Object(); // Dummy
+        console.log("Warning: Unable to locate an search type select id 'search-type'");
+    }
+    if (domainSelectorInput) {
+        domainSelectorInput.addEventListener("input", domainChanged);
+    } else {
+        domainSelectorInput = new Object(); // Dummy
         console.log("Warning: Unable to locate an input field with id 'domain-selector': Domain selection is disabled");
     }
-    if (document.getElementById("domain-selector-to")) {
-        document.getElementById("domain-selector-to").addEventListener("input", domainToChanged);
+    if (domainSelectorToInput) {
+        domainSelectorToInput.addEventListener("input", domainToChanged);
+    } else {
+        domainSelectorToInput = new Object(); // Dummy
     }
     if (document.getElementById("domain-feedback")) {
         var domainFeedback = document.getElementById("domain-feedback");
@@ -538,24 +647,4 @@ if (typeof myDragon == 'undefined') {
         var domainFeedback = new Object(); // Dummy
         console.log("Warning: Unable to locate an element with id 'domain-feedback': Feedback on domain matching is disabled");
     }
-}
-if (typeof myDragon != 'undefined') {
-    myDragon.addHandler('canvas-click', function(info) {
-        if (!info.quick) { // info.quick = not dragged
-            return;
-        }
-        var relative = myDragon.viewport.pointFromPixel(info.position);
-        var gx = relative.x*viewbox.x2 + viewbox.x1;
-        var gy = relative.y*viewbox.x2 + viewbox.y1;
-        var arrayLength = domains.length; // domains is defined in domains.js
-        for (var i = 0; i < arrayLength; i++) {
-            var d = domains[i];
-            if (d.x-d.r <= gx && d.x+d.r >= gx &&
-                d.y-d.r <= gy && d.y+d.r >= gy) {
-                markLinks(d.d, i, !info.shift);
-                return;
-            }
-        }
-        clearSVGOverlay();
-    });
 }
