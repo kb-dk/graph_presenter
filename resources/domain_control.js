@@ -78,6 +78,9 @@ function getSVGText(domain) {
 }
 
 function getDomainColor(domain) {
+    if (!domain.out) {
+        return "cccccc";
+    }        
     var links = domain.out.length == 0 ? domain.in : domain.out;
     if (links.length == 0) {
         console.log("No links");
@@ -147,6 +150,9 @@ function markLinks(domainName, domainIndex, clearPrevious) {
 {d:"391.org", x:-589.0432, y:-281.74088, r:5.0, in:"222(-589.385315,-193.555618~-604.705933,-255.864410);223(-591.702942,-188.440689~-606.290222,-254.769012)", out:""},
 */
 function expandLinks(source, sourceIndex, linksString, reverse) {
+    if (!linksString) {
+        return [];
+    }
     var tokens = linksString.split(";");
     var links = [];
     var sourceCoordinates = source.x + ',' + source.y;
@@ -203,6 +209,9 @@ function expandAllLinks(index) {
 }    
 
 function linksIndexes(linksString) {
+    if (!linksString) {
+        return [];
+    }
     var tokens = linksString.split(";");
     var indexes = [];
     var arrayLength = tokens.length;
