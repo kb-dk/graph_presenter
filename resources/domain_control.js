@@ -529,8 +529,9 @@ function markShortestPath(sourceName, destName) {
     } else if (destIndex == -1) {
         message("Unable to locate destination '" + destName + "'");
         return
-    }        
-    var path = findShortestPath(sourceIndex, destIndex, true, true);
+    }
+    var dir = directionSelect.value;
+    var path = findShortestPath(sourceIndex, destIndex, dir == "bi" || dir == "in", dir == "bi" || dir == "out");
     if (path) {
         message("Shortest path: " + pathToText(path));
         markPath(path);
@@ -574,10 +575,12 @@ var searchTypeChanged = function(e) {
     switch (searchType) {
     case "search":
         domainSelectorToInput.style.visibility = 'hidden';
+        directionSelect.style.visibility = 'hidden';
         domainChanged();
         break
     case "connect": 
         domainSelectorToInput.style.visibility = 'visible';
+        directionSelect.style.visibility = 'visible';
         domainToChanged();
        break
     default:
@@ -631,6 +634,7 @@ var canvasClicked = function(info) {
 var domainSelectorInput = document.getElementById("domain-selector");
 var domainSelectorToInput = document.getElementById("domain-selector-to");
 var searchTypeSelect = document.getElementById("search-type");
+var directionSelect = document.getElementById("connect-direction");
 
 if (typeof myDragon == 'undefined') {
     console.error("Error: The variable 'myDragon' is not set. Unable to provide visual domain marking");
@@ -644,6 +648,13 @@ if (typeof myDragon == 'undefined') {
     } else {
         searchTypeSelect = new Object(); // Dummy
         console.log("Warning: Unable to locate an search type select id 'search-type'");
+    }
+    if (directionSelect) {
+        directionSelect.selectedIndex = 0;
+        directionSelect.addEventListener("input", domainToChanged);
+    } else {
+        directionSelect = new Object(); // Dummy
+        console.log("Warning: Unable to locate connection direction select id 'connect-direction'");
     }
     if (domainSelectorInput) {
         domainSelectorInput.addEventListener("input", domainChanged);
