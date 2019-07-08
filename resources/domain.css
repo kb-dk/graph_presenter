@@ -22,11 +22,27 @@ a:link 		{ color: #33f; }
 a:visited 	{ color: #808; }
 a:active 	{ color: #f00; }
 
+#loader {
+    position: absolute;
+    left: 20%;
+    top: 20%;
+    width: 60%;
+    height: 4em;
+    font-size: 5em;
+    text-align: center;
+    padding-top: 2.5em;
+    z-index: 400;
+    border: 10px solid blue;
+    border-radius: 50%;
+    background: white;
+    opacity: 0.9;
+}
+
 #pageheader {
     position: absolute;
     width: 100%;
     height: 5em;
-    z-index: 1;
+    z-index: 200;
     top: 30px;
     padding: 0 1em 0 1em;
 }
@@ -80,6 +96,22 @@ a:active 	{ color: #f00; }
 }
 #searchbox, #collapsor {
     color: #32611F;
+    z-index: 100;
+}
+
+#svg-overlay {
+
+}
+
+#diffusor-overlay {
+    background: white;
+    opacity: 0.0;
+}
+
+#domain-feedback {
+    background: white;
+    padding: 0.1em 0.1em 0.1em 0.1em;
+    opacity: 0.9;
 }
 
 /* Used when there are too many matches for animation to be feasible */
@@ -91,6 +123,16 @@ a:active 	{ color: #f00; }
     width: 100px;
     height: 100px;
 }
+
+.domain-overlay-mimick {
+    box-shadow: 0 0 0 3px black;
+    background-color: rgba(255, 255, 255, 0.0); // Trick to get title to display a tooltip on hover
+    border-style: solid;
+    border-radius: 50%;
+    width: 100px;
+    height: 100px;
+}
+
 .domain-overlay-in-hp {
     border: 3px solid purple;
     border-style: dotted;

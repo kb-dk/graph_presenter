@@ -15,16 +15,29 @@
             <h1>Graph for ${DEST}</h1>
         </div>
         <div id="searchbox">
-            Search: <input type="text" id="domain-selector"/> <span id="domain-feedback">&nbsp;</span>
+            <select name="search-type" id="search-type">
+                <option value="search">Search</option>
+                <option value="connect">Connect</option>
+            </select>
+            <input type="text" placeholder="domain" id="domain-selector" title="Click a domain-circle to fill" />
+            <select name="connect-direction" id="connect-direction" style="visibility: hidden">
+                <option value="bi">↔</option>
+                <option value="out">→</option>
+                <option value="in">←</option>
+            </select>
+            <input type="text" placeholder="destination" id="domain-selector-to" title="Shift-click a domain circle to fill" style="visibility: hidden"/>
+            <span id="domain-feedback">&nbsp;</span>
         </div>
     </div>
-      
+    <div id="loader">Loading node map...</div>
     <div id="zoom-display" class="openseadragon"></div>
 
     <script type="text/javascript">
         var myDragon = OpenSeadragon({
         id:            "zoom-display",
-        
+
+        gestureSettingsTouch : {clickToZoom: false, dblClickToZoom: true},
+        gestureSettingsMouse: {clickToZoom: false, dblClickToZoom: true},
         zoomPerScroll: 2.0,
         showNavigator:  false,
         wrapHorizontal: false,

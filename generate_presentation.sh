@@ -35,7 +35,7 @@ DZI="${B}.dzi"
 : ${RENDER_META:="true"}
 
 # PNG & DeepZoom tile parameters
-: ${RENDER_SIZE:="20000"}
+: ${RENDER_SIZE:="10000"}
 : ${RENDER_WIDTH:="$RENDER_SIZE"}
 : ${RENDER_HEIGHT:="$RENDER_SIZE"}
 : ${FORMAT:="png"} # Gephi charts are circles, lines and text so PNG is probably best choice
@@ -54,9 +54,11 @@ DZI="${B}.dzi"
 : ${DAT_ALL:="${DEST}/all.dat"}
 : ${DAT_CL:="${DEST}/coordinates_links.dat"}
 : ${DAT_CL_INDEX:="${DEST}/coordinates_links_index.dat"}
+: ${DAT_CL_INDEX_TEXT:="${DEST}/coordinates_links_index_text.dat"}
 : ${DAT_OUT:="${DEST}/links_out.dat"}
 : ${DAT_IN:="${DEST}/links_in.dat"}
 : ${DAT_IN_OUT:="${DEST}/links_in_out.dat"}
+: ${DAT_TEXT:="${DEST}/text.dat"}
 
 # We need to declase associative arrays at the root (why?)
 declare -A DOMAIN_INDEX_MAP
@@ -91,11 +93,20 @@ check_parameters() {
         MISSING=true
     fi
     if [[ .$(which vips) == . ]]; then
-        >&2 echo "Error: 'vips' not available, please install it"
-        MISSING=true
+        if [[ "true" == "$RENDER_TILES" ]]; then
+            >&2 echo "Error: 'vips' not available, please install it"
+            MISSING=true
+        elif [[ "true" == "$VIPS_ONLY" && "true" == "$RENDER_PNG" ]]; then
+            >&2 echo "Error: 'vips' not available, please install it"
+            MISSING=true
+        fi
     fi
     if [[ "true" == "$MISSING" ]]; then
         usage 2
+    fi
+    if [[ .$(which xmllint) == . ]]; then
+        >&2 echo "Error: 'xmllint' not available, please install it"
+        usage 3
     fi
     SVG_ABSOLUTE=$(echo "$(cd "$(dirname "$SVG")"; pwd)/$(basename "$SVG")")
     PNG_ABSOLUTE=$(echo "$(cd "$(dirname "$PNG")"; pwd)/$(basename "$PNG")")
@@ -211,27 +222,38 @@ collapse() {
         local LEFT=${TOKENS[0]}
         local RIGHT=${TOKENS[1]}
         if [[ "$LAST" == "$LEFT" ]]; then
-            echo -n ",§$RIGHT§"
+            echo -n ";$RIGHT"
         else
             if [[ "$LAST" != "%%%" ]]; then
-                echo "]"
+                echo "\""
             fi
-            echo -n "$LEFT [§$RIGHT§"
+            echo -n "$LEFT \"$RIGHT"
         fi
         LAST="$LEFT"
     done
-    echo "]"
+    echo "\""
 }
 
 # domain in_links out_links
 extract_links() {
     if [[ ! -s "$DAT_IN_OUT" ]]; then
         # Yes we need sort both before and after collapse
-        grep 'class="id_.* id_' "$SVG" | sed 's/.*class="id_\([^ ]*\) id_\([^ ]*\)".*/\1 \2/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_OUT"
-        grep 'class="id_.* id_' "$SVG" | sed 's/.*class="id_\([^ ]*\) id_\([^ ]*\)".*/\2 \1/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_IN"
-        LC_ALL=C join -j 1 -a 1 -a 2 -e '[]' -o 0 1.2 2.2 "$DAT_IN" "$DAT_OUT" > "$DAT_IN_OUT"
+        normalise_svg | grep 'class="id_.* id_' | sed 's/.* d="M [^ ]* C \([^ ]*\) \([^ ]*\) .*class="id_\([^ ]*\) id_\([^ ]*\)".*stroke="\([^"]*\)".*/\3 §\4§(\1~\2\5)/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_OUT"
+        # TODO: Consider storing only the path-coordinates for one way
+        normalise_svg | grep 'class="id_.* id_' | sed 's/.* d="M [^ ]* C \([^ ]*\) \([^ ]*\) .*class="id_\([^ ]*\) id_\([^ ]*\)".*stroke="\([^"]*\)".*/\4 §\3§(\1~\2\5)/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_IN"
+#        grep 'class="id_.* id_' "$SVG" | sed 's/.*class="id_\([^ ]*\) id_\([^ ]*\)".*/\1 \2/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_OUT"
+#        grep 'class="id_.* id_' "$SVG" | sed 's/.*class="id_\([^ ]*\) id_\([^ ]*\)".*/\2 \1/' | LC_ALL=c sort -u | collapse | LC_ALL=c sort > "$DAT_IN"
+        LC_ALL=C join -j 1 -a 1 -a 2 -e '""' -o 0 1.2 2.2 "$DAT_IN" "$DAT_OUT" > "$DAT_IN_OUT"
     fi
     cat "$DAT_IN_OUT"
+}
+
+# fontsize & fontname
+extract_text_properties() {
+    if [[ ! -s "$DAT_TEXT" ]]; then
+        normalise_svg | grep '<text.* class="id_.*' | sed 's/.*font-size="\([^"]*\)".*font-family="\([^"]*\)".*class="id_\([^" ]*\).*/\3 \1 "\2"/' | LC_ALL=c sort -u > "$DAT_TEXT"
+    fi
+    cat "$DAT_TEXT"
 }
 
 # domain in out total
@@ -239,13 +261,17 @@ extract_link_stats() {
     if [[ ! -s "$DAT_LINKS" ]]; then
         local T_IN=$(mktemp)
         local T_OUT=$(mktemp)
-        grep -o 'class="[^ "]\+ id_[^"]*' "$SVG" | sed 's/class="[^ "]\+ id_\(.*\)/\1/' | sort | uniq -c | sed 's/\s*\([0-9]*\) \(.*\)/\2 \1/' | LC_ALL=C sort > $T_IN
-        grep -o 'class="id_[^ "]* ' "$SVG" | sed 's/class="id_\(.*\) /\1/' | sort | uniq -c | sed 's/\s*\([0-9]*\) \(.*\)/\2 \1/' | LC_ALL=C sort > $T_OUT
+        grep -o 'class="[^ "]\+ id_[^"]*' "$SVG" | sed 's/class="[^ "]\+ id_\(.*\)/\1/' | LC_ALL=c sort | LC_ALL=c uniq -c | sed 's/\s*\([0-9]*\) \(.*\)/\2 \1/' | LC_ALL=C sort > $T_IN
+        grep -o 'class="id_[^ "]* ' "$SVG" | sed 's/class="id_\(.*\) /\1/' | LC_ALL=c sort | LC_ALL=c uniq -c | sed 's/\s*\([0-9]*\) \(.*\)/\2 \1/' | LC_ALL=C sort > $T_OUT
         LC_ALL=C join -j 1 -a 1 -a 2 -e 0 -o 0 1.2 2.2 $T_IN $T_OUT | sed 's/\(.*\) \([0-9]\+\) \([0-9]\+\)$/echo "\1 \2 \3 $((\2+\3))"/e' > "$DAT_LINKS"
         rm $T_IN $T_OUT
     fi
     cat "$DAT_LINKS"
 }
+
+extract_textfont() {
+    echo "var textfont=\"$(normalise_svg | grep '<text' | head -n 1 | sed 's/.*font-family="\([^"]*\)".*/\1/')\";"
+}   
 
 extract_viewbox() {
     grep -o 'viewBox="[^"]*' < "$SVG" | sed 's/.*"\([^ ]*\) *\([^ ]*\) *\([^ ]*\) *\([^ ]*\) */var viewbox= {x1: \1, y1: \2, x2: \3, y2: \4};/'
@@ -262,7 +288,7 @@ extract_nodes_circles_raw() {
 # domain x y r in_links out_links
 extract_coordinates_links() {
     if [[ ! -s "$DAT_CL" ]]; then
-        join -j 1 -a 1 -a 2 -e '[]' -o 0 1.2 1.3 1.4 2.2 2.3 <(extract_nodes_circles_raw) <(extract_links) > "$DAT_CL"
+        LC_ALL=c join -j 1 -a 1 -a 2 -e '""' -o 0 1.2 1.3 1.4 2.2 2.3 <(extract_nodes_circles_raw) <(extract_links) > "$DAT_CL"
     fi              
     cat "$DAT_CL"
 }
@@ -329,10 +355,18 @@ extract_coordinates_links_index() {
     cat "$DAT_CL_INDEX"
 }
 
+# domain x y r in_links_indexes out_links_indexes fontsize
+extract_coordinates_links_index_text() {
+    if [[ ! -s "$DAT_CL_INDEX_TEXT" ]]; then
+        LC_ALL=c join -j 1 -a 1 -a 2 -e '12' -o 0 1.2 1.3 1.4 1.5 1.6 2.2 <(extract_coordinates_links_index) <(extract_text_properties) > "$DAT_CL_INDEX_TEXT"
+    fi
+    cat "$DAT_CL_INDEX_TEXT"
+}
+
 # domain x y r in out all
 extract_all_raw() {
     if [[ ! -s "$DAT_ALL" ]]; then
-        join -j 1 -a 1 -a 2 -e 0 -o 0 2.2 2.3 2.4 1.2 1.3 1.4 <(extract_link_stats) <(extract_nodes_circles_raw) > "$DAT_ALL"
+        LC_ALL=c join -j 1 -a 1 -a 2 -e 0 -o 0 2.2 2.3 2.4 1.2 1.3 1.4 <(extract_link_stats) <(extract_nodes_circles_raw) > "$DAT_ALL"
     fi              
     cat "$DAT_ALL"
 }
@@ -434,7 +468,7 @@ close_mapping() {
 extract_linked() {
     echo "var domains= ["
     # wired.com -1063.7798 27.971643 5.0 [1337,1338,2129] []
-    extract_coordinates_links_index | sed 's/\([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\)/{d:"\1", x:\2, y:\3, r:\4, in:\5, out:\6},/'
+    extract_coordinates_links_index_text | sed 's/\([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\) \([^ ]\+\)/{d:"\1", fs:\7, x:\2, y:\3, r:\4, in:\5, out:\6},/'
     echo "];"
     
 }
@@ -460,15 +494,34 @@ extract_linked_mapping() {
     close_mapping
 }
 
+# Cloaded loader-div
+get_linked_footer() {
+    cat <<EOF
+var loader = document.getElementById("loader");
+if (loader) {
+    loader.parentNode.removeChild(loader);
+}
+EOF
+}
+
 create_linked_json() {
     if [[ -s "${DEST}/linked.js" ]]; then
         echo "- Skipping linked node data extraction as '${DEST}/linked.js' already exists"
         return
     fi
     echo "- Extracting linked node data to ${DEST}/linked.js"
-    extract_viewbox > "${DEST}/linked.js"
+    extract_textfont > "${DEST}/linked.js"
+    extract_viewbox >> "${DEST}/linked.js"
 #    extract_domain_list >> "${DEST}/linked.js"
     extract_linked >> "${DEST}/linked.js"
+    get_linked_footer >> "${DEST}/linked.js"
+}
+
+# A JSON without links-information
+create_alternative_jsons() {
+    cp "${DEST}/linked.js" "${DEST}/linked_full.js"
+    sed 's/\(^{d:[^}]*\), in:[^}]*, out:[^}]*}/\1}/' < "${DEST}/linked.js" > "${DEST}/simple.js"
+    sed 's/([0-9.,~-]\+#[a-f0-9]\+)//g'  < "${DEST}/linked.js" > "${DEST}/linked_no_lines.js"
 }
 
 copy_files() {
@@ -510,6 +563,7 @@ if [[ "true" == "$RENDER_META" ]]; then
     fetch_dragon
 #    extract_all_json
     create_linked_json
+    create_alternative_jsons
     copy_files
 else
     echo "- Skipping rendering of metadata (nodes.js, index.html and supporting files)"
