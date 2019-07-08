@@ -466,11 +466,25 @@ function message(m) {
     domainFeedback.innerHTML = m;
 }
 
+function isNodeIndexInLinks(linksString, nodeIndex) {
+    var li = linksIndexes(linksString);
+    console.log("Locating " + nodeIndex + " in " + li);
+    for (var i = 0 ; i < li.length ; i++) {
+        if (li[i] == nodeIndex) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function pathToText(path) {
     var s = domains[path[0]].d;
-    for (var i = 1 ; i < path.length ; i++) {
-        // TODO: Make the arrows indicate the link direction
-        s +=" ↔ " + domains[path[i]].d;
+    for (var i = 0 ; i < path.length-1 ; i++) {
+        var sourceDomain = domains[path[i]];
+        var outLink = isNodeIndexInLinks(sourceDomain.out, path[i+1]);
+        var inLink = isNodeIndexInLinks(sourceDomain.in, path[i+1]);
+        s += outLink && inLink ? " ↔ " : inLink ? " ← " : outLink ? " → " : " ? ";
+        s += domains[path[i+1]].d;
     }
     return s;
 }
