@@ -47,20 +47,15 @@ The JavaScript `domain_control.js` supports search by looking sequentially throu
 
 
 # Notes & to-do
-* Rendering in 50K is doable on a 16GB machine, but might take hours. More RAM helps a lot. GraphicsMagic is the bottleneck here. A better scaling SVG→PNG converter would be a welcome addition.
-* GraphicsMagic has a problem with kerning for some renders. It should be investigated whether changing fonts could help here.
-* Both render-size and font-kerning seems to have been solved for the experimental version of `vips` described in the section below. Direct `vips`-support should be added to the `generate_presentation.sh`-script.
+* Rendering in 50K is doable on a 16GB machine, but might take hours. More RAM helps a lot. GraphicsMagic is the bottleneck here.
+* GraphicsMagic has a problem with kerning for some renders.
+* Both render-size and font-kerning seems to have been solved in the latest version of `vips` described in the section below.
 
 # Adventures with vips
 
-[vips](https://github.com/libvips/libvips) excels in handling large images, but due to to [issue 732](https://github.com/libvips/libvips/issues/732) and [issue 1354](https://github.com/libvips/libvips/issues/1354) the current release (2019-07-01) cannot handle large SVGs. Luckily it is simple to compile:
-```
-git clone `https://github.com/libvips/libvips.git`
-cd libvips
-git checkout add-unlimited-to-svgload
+[vips](https://github.com/libvips/libvips) excels in handling large images, but due to to [issue 732](https://github.com/libvips/libvips/issues/732) and [issue 1354](https://github.com/libvips/libvips/issues/1354) the current release (2019-07-01) cannot handle large SVGs.
 
-```
-then follow the instructions at [Building libvips from git](https://github.com/libvips/libvips/tree/add-unlimited-to-svgload#building-libvips-from-git). For a specific Ubuntu-version of the instructions, see [Build for Ubuntu / Building from source](https://github.com/libvips/libvips/wiki/Build-for-Ubuntu#building-from-source).
+Luckily the issues has been resolved in `master` and `vips` is simple to compile: Follow the instructions at [Building libvips from git](https://github.com/libvips/libvips/tree/add-unlimited-to-svgload#building-libvips-from-git). For a specific Ubuntu-version of the instructions, see [Build for Ubuntu / Building from source](https://github.com/libvips/libvips/wiki/Build-for-Ubuntu#building-from-source).
 
 `vips` controls render-size of SVGs with `dpi`, but we can derive that from the input SVG and the wanted size in pixels. If we have `1998_to_2003.svg` and want DeepZoom tiles for a virtual size of 160000x160000 pixels (25 gigapixel), we can do
 ```
@@ -69,4 +64,10 @@ echo $(( 160000 * 72 / $(head -n 100 1998_to_2003.svg | tr '\n' ' ' | grep -o '<
 For this case it gives us `366` DPI, which we feed to `vips`, together with the `unlimited`-option that allow us to render SVGs larger than 10MB:
 ```
 vips dzsave '1998_to_2003.svg[dpi=366,unlimited]' 1998_to_2003_160K --suffix .png
+```
+
+All this is handled by the `generate_presentation.sh` script, so if a new version of `vips` has been compiles & installed, as described above, the `png`-step can be skipped and the tiles rendered directly without GraphicsMagic, making it possible to create renderings of 25-50 GigaPixel on a machine with 16GB of RAM:
+
+```
+RENDER_SIZE=160000 RENDER_PNG=false VIPS_ONLY=true ./generate_presentation.sh 1998_to_2003.svg
 ```
