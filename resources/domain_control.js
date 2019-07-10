@@ -365,13 +365,18 @@ function markMatching(domainInfix) {
     }
 }
 
+/*
+As all edges has the same weight, Dijkstra's shortest path is effectively breath-first
+and we can just return the first element as JavaScript's Map iterates in insertion order
+*/
 function getShortest(unvisited) {
     var min = Infinity;
     var entryKey = null;
     for (var [key, value] of unvisited.entries()) {
-        if (value.dist < min) {
+        if (value.dist < min) { // Sanity check that should not be needed
             min = value.dist;
             entryKey = key;
+            return entryKey;
         }
     }
     return entryKey;
