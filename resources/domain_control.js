@@ -475,8 +475,8 @@ function findShortestPath(sourceIndex, destIndex, visitIn=defaultVisitIn, visitO
     return !path || path == "EON" ? undefined : path;
 }
 
-function message(m) {
-    console.log(m);
+function message(m, mlog) {
+    console.log(m + (mlog ? mlog : ''));
     domainFeedback.innerHTML = m;
 }
 
@@ -503,6 +503,7 @@ function pathToText(path) {
 }
 
 function markShortestPath(sourceName, destName) {
+    var start = window.performance.now();
     myDragon.clearOverlays();
     clearSVGOverlay();
     createSVGOverlay();
@@ -546,11 +547,12 @@ function markShortestPath(sourceName, destName) {
     }
     var dir = directionSelect.value;
     var path = findShortestPath(sourceIndex, destIndex, dir == "bi" || dir == "in", dir == "bi" || dir == "out");
+    var ms = window.performance.now()-start;
     if (path) {
-        message("Shortest path: " + pathToText(path));
+        message("Shortest path: " + pathToText(path), " in " + ms + "ms");
         markPath(path);
     } else {
-        message("Unable to find path from '" + sourceName + "' to '" + destName + "'");
+        message("Unable to find path from '" + sourceName + "' to '" + destName, "' in " + ms + "ms");
     }
 }
 
