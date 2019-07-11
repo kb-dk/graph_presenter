@@ -4,7 +4,9 @@ var heavyMarked = 150;  // Limit for heavy (animated) marking
 var maxMarked =  1000;  // Overall limit for marking
 var baseRadius =   20;  // TODO: Couple this to render size
 var baseMargin =  200; // TODO: Should be coupled to zoom level
-var strokeWidth = 2.0;
+var browseStrokeWidth = 2.0;
+var connectStrokeWidth = 5.0;
+
 // Which links to consider when calculating shortest path between two nodes
 var defaultVisitIn = false;
 var defaultVisitOut = true;
@@ -52,7 +54,7 @@ function updateSVGOverlay(svgXML) {
     diffusor.style.opacity = 0.8;
 }
 
-function drawLinks(links) {
+function drawLinks(links, strokeWidth = browseStrokeWidth) {
     var svgLines = '';
     for (var i = 0 ; i < links.length ; i++) {
         var link = links[i];
@@ -297,14 +299,19 @@ function getLinkBetween(sourceIndex, destIndex) {
 /*
 Given an array of indexes, mark all nodex and the immediate paths between subsequent nodes
 */
-function markPath(nodeIndexes) {
+function markPath(nodeIndexes, strokeWidth = browseStrokeWidth) {
     clearSVGOverlay();
+    // Links first
     for (var i = 0 ; i < nodeIndexes.length ; i++) {
         var node = domains[nodeIndexes[i]];
-        updateSVGOverlay(getSVGCircle(node));
         if (i < nodeIndexes.length-1) {
-            drawLinks(getLinkBetween(nodeIndexes[i], nodeIndexes[i+1]));
+            drawLinks(getLinkBetween(nodeIndexes[i], nodeIndexes[i+1]), strokeWidth);
         }
+    }
+    // Nodes second (so that they are displayed on top of links)
+    for (var i = 0 ; i < nodeIndexes.length ; i++) {
+        var node = domains[nodeIndexes[i]];
+        updateSVGOverlay(getSVGCircle(node) + getSVGText(node));
     }
 //        console.log(path[i] + ": " + domains[path[i]].d);
 }
@@ -555,7 +562,7 @@ function markShortestPath(sourceName, destName) {
     var ms = window.performance.now()-start;
     if (path) {
         message("Shortest path: " + pathToText(path), " in " + ms + "ms");
-        markPath(path);
+        markPath(path, connectStrokeWidth);
     } else {
         message("Unable to find path from '" + sourceName + "' to '" + destName, "' in " + ms + "ms");
     }
