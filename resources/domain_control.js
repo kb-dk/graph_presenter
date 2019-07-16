@@ -737,6 +737,7 @@ function markShortestPath(sourceName, destName) {
 }
 
 var animationCallback = null;
+
 var domainChanged = function(e) {
     if (animationCallback != null) {
         window.cancelAnimationFrame(animationCallback);
@@ -748,6 +749,7 @@ var domainChanged = function(e) {
             markMatching(domainInput);
             break;
         case "connect":
+            markMatching(domainInput);
             var domainToInput = domainSelectorToInput.value.toLowerCase();
             markShortestPath(domainInput, domainToInput);
             break;
@@ -762,6 +764,7 @@ var domainToChanged = function(e) {
     var domainToInput = domainSelectorToInput.value.toLowerCase();
     message("Finding shortest path from '" + domainInput + "' to '" + domainToInput + "'...");
     animationCallback = window.requestAnimationFrame(function(timestamp) {
+        markMatching(domainToInput);
         markShortestPath(domainInput, domainToInput);
     });
 }
