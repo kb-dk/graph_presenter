@@ -516,11 +516,13 @@ function createSPState() {
     var numDomains = domains.length;
     var markerBuffer = new ArrayBuffer(numDomains*2);
     var referenceBuffer = new ArrayBuffer(numDomains*4);
+    var illegals = getIllegalVisits();
     
     // TODO: Add sparse tracking for faster hasNext-iteration
     return {
         markers: new Uint16Array(markerBuffer),
         references: new Uint32Array(referenceBuffer),
+        illegals: illegals,
         maxDepth: 0,
         /*
           Iterates all entries with the given depth, calling callback(nodeIndex, SPState) for each.
@@ -550,14 +552,17 @@ function createSPState() {
           Returns true if the destination was updated.
         */
         updateUnvisited: function(nodeIndex, depth, parent) {
+            if (this.illegals.has(Number(nodeIndex))) {
+                return;
+            }
             if (this.maxDepth < depth) { // TODO: Pretty bad to have it here instead of updateMultiVisited
                 this.maxDepth = depth;
             }
             var existing = this.markers[nodeIndex];
-            if (existing == 1) {
+            if (existing == 1) { // Already visited
                 return false;
             }
-            if (existing == 0 || existing-2 > depth) {
+            if (existing == 0 || existing-2 > depth) { // Undefined or unvisited at higher level
                 this.markers[nodeIndex] = depth+2;
                 this.references[nodeIndex] = parent;
                 return true;
