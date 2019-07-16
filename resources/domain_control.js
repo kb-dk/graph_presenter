@@ -226,6 +226,16 @@ function linksIndexes(linksString) {
     }
     return indexes;
 }
+function linksIndexesFromNode(node, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
+    var links = [];
+    if (visitIn) {
+        links = links.concat(linksIndexes(node.in));
+    }
+    if (visitOut) {
+        links = links.concat(linksIndexes(node.out));
+    }
+    return links;
+}
 
 /*
 Visually marks the domains for all given indexes.
@@ -466,7 +476,7 @@ While O(n^2) sounds problematic, only insanely interlinked graphs should take a 
 Note: illegalNodesForShortestPath holds a list of domains to ignore when doing traversal: It is not very 
       interesting to see that a & b are connected by linking to google.com
 */
-function findShortestPath(sourceIndex, destIndex, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
+function findShortestPathObjects(sourceIndex, destIndex, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
     var visited = getIllegalVisits();
     visited.delete(sourceIndex);
     visited.delete(destIndex);
@@ -485,6 +495,164 @@ function findShortestPath(sourceIndex, destIndex, visitIn=defaultVisitIn, visitO
 
     while ((path = traverse(visited, unvisited, destIndex, visitIn, visitOut)) == "");
     return !path || path == "EON" ? undefined : path;
+}
+
+/*
+SPState holds Shortest Path state. All nodes are represented internally as a compact array
+and logically as a set.
+
+Each node has a marker that is either
+0) Undefined (has not been seen during traversal)
+1) Visited
+2+) Unvisited (marker-2 is the distance from source, aka depth)
+
+Each unvisited node also holds the node-index of the node linking to it, making it
+possible to unravel the path back to the source.
+
+Markers are unsigned 16-bit integers (so a path can at most be 65533 nodes long),
+back-references to previous nodes are 32-bit integers (4 billion nodes).
+*/
+function createSPState() {
+    var numDomains = domains.length;
+    var markerBuffer = new ArrayBuffer(numDomains*2);
+    var referenceBuffer = new ArrayBuffer(numDomains*4);
+    var illegals = getIllegalVisits();
+    
+    // TODO: Add sparse tracking for faster hasNext-iteration
+    return {
+        markers: new Uint16Array(markerBuffer),
+        references: new Uint32Array(referenceBuffer),
+        illegals: illegals,
+        maxDepth: 0,
+        /*
+          Iterates all entries with the given depth, calling callback(nodeIndex, SPState) for each.
+          Trick: Calling with depth == -1 gives all visited, depth == -2 gives all undefined.
+          If callback returns anything else than -1, iteration is stopped and the return
+          value is returned. Else -1 is returned at the end.
+        */
+        iterate: function(depth, callback) {
+            var marker = depth+2;
+            for (var i = 0 ; i < this.markers.length ; i++) {
+                if (this.markers[i] == marker) {
+                    var result = callback(i, this);
+                    if (result != -1) {
+                        return result;
+                    }
+                }
+            }
+            return -1;
+                
+        },
+        setVisited: function(nodeIndex) {
+            this.markers[nodeIndex] = 1;
+        },
+        /*
+          Sets the state to unvisited if the marker is undefined or if (the marker is
+          unvisited and the existing depth > new depth)
+          Returns true if the destination was updated.
+        */
+        updateUnvisited: function(nodeIndex, depth, parent) {
+            if (this.illegals.has(Number(nodeIndex))) {
+                return;
+            }
+            if (this.maxDepth < depth) { // TODO: Pretty bad to have it here instead of updateMultiVisited
+                this.maxDepth = depth;
+            }
+            var existing = this.markers[nodeIndex];
+            if (existing == 1) { // Already visited
+                return false;
+            }
+            if (existing == 0 || existing-2 > depth) { // Undefined or unvisited at higher level
+                this.markers[nodeIndex] = depth+2;
+                this.references[nodeIndex] = parent;
+                return true;
+            }
+            return false;
+        },
+        /*
+          Calls updateVisited for all given nodeIndexes.
+          If one of the nodeIndexes is equal to destIndex, processing is stopped and the index is returned,
+          else -1 is returned.
+        */
+        updateMultiVisited: function(nodeIndexes, destIndex, depth, parent) {
+            for (var i = 0 ; i < nodeIndexes.length ; i++) {
+                this.updateUnvisited(nodeIndexes[i], depth, parent);
+                if (nodeIndexes[i] == destIndex) {
+                    return nodeIndexes[i];
+                }
+            }
+            return -1;
+        },
+        /*
+          For a given nodeIndex, follow its edges and register connected nodes as unvisited, lastly 
+          marking the nodeIndex as visited.
+          If the destIndex is encountered, it is returned immediately, else -1 is returned.
+        */
+        processNode: function(nodeIndex, depth, destIndex, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
+            this.setVisited(nodeIndex);
+            var nodeIndexes = linksIndexesFromNode(domains[nodeIndex], visitIn, visitOut);
+            return this.updateMultiVisited(nodeIndexes, destIndex, depth+1, nodeIndex);
+        },
+        /*
+          Iterate all nodes at a given depth, for each following its edges and registering connected
+          nodes as unvisited, lastly marking the iterated node as visited.
+          If at any time the destIndex is encountered, it is returned immediately, else -1 is returned.
+        */
+        processDepth: function(depth, destIndex, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
+            return this.iterate(depth, function(nodeIndex, state) {
+                // Same as processNode, but we inline for speed (just guessing here, should be measured)
+                state.setVisited(nodeIndex);
+                var nodeIndexes = linksIndexesFromNode(domains[nodeIndex], visitIn, visitOut);
+                var result = state.updateMultiVisited(nodeIndexes, destIndex, depth+1, nodeIndex);
+                return result;
+            });
+        },
+        /*
+          Performs a breadth-first search from sourceIndex to destIndex.
+          Returns destIndex if found, else -1.
+        */
+        findDestination: function(sourceIndex, destIndex, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
+            if (sourceIndex == destIndex) {
+                return destIndex;
+            }
+            var result = this.processNode(sourceIndex, 0, destIndex, visitIn, visitOut);
+            if (result != -1) {
+                return result;
+            }
+            var depth = 1;
+            while (depth <= this.maxDepth && result == -1) {
+                result = this.processDepth(depth, destIndex, visitIn, visitOut);
+                ++depth;
+            }
+            return result;
+        },
+        findPath: function(sourceIndex, destIndex, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
+        /*
+          Performs a breadth-first search from sourceIndex to destIndex.
+          nodeIndexes from sourceIndex to destiIndex (both inclusive) is a path is found, else undefined
+        */
+            var result = this.findDestination(sourceIndex, destIndex, visitIn, visitOut);
+            if (result == -1) {
+                return undefined;
+            }
+            var path = [destIndex];
+            var index = destIndex;
+            while (index != sourceIndex) {
+                path.push(index = this.references[index]);
+            }
+            return path.reverse();
+        }
+    }
+}
+
+/*
+Finds the shortest path between two nodes, using Dijkstra's algorithm O(n^2).
+While O(n^2) sounds problematic, only insanely interlinked graphs should take a long time.
+Note: illegalNodesForShortestPath holds a list of domains to ignore when doing traversal: It is not very 
+      interesting to see that a & b are connected by linking to google.com
+*/
+function findShortestPath(sourceIndex, destIndex, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
+    return createSPState().findPath(sourceIndex, destIndex, visitIn, visitOut);
 }
 
 function message(m, mlog) {
