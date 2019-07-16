@@ -547,8 +547,12 @@ echo "Starting processing of $SVG $(date +"%Y-%m%d %H:%M")"
 if [[ "true" == "$RENDER_PNG" ]]; then
     create_png
 elif [[ "false" == "$VIPS_ONLY" ]]; then
-    echo "- RENDER_PNG=${RENDER_PNG} specified, but with VIPS_ONLY=${VIPS_ONLY}, a PNG is required and will thus be rendered anywat"
-    create_png
+    if [[ "false" == "$RENDER_TILES" ]]; then
+    echo "- Skipping rendering of PNG as RENDER_PNG=${RENDER_PNG} and RENDER_TILES=${RENDER_TILES}"
+    else 
+        echo "- RENDER_PNG=${RENDER_PNG} specified, but with VIPS_ONLY=${VIPS_ONLY}, a PNG is required and will thus be rendered anywat"
+        create_png
+    fi
 else
     echo "- Skipping rendering of PNG as RENDER_PNG=${RENDER_PNG}"
 fi
