@@ -17,12 +17,12 @@ pushd ${BASH_SOURCE%/*} > /dev/null
 SCRIPT_HOME="$(pwd)"
 
 : ${SVG:="$1"}
-B=$(basename -- "$SVG")
-B=${B%.*}
-DZI="${B}.dzi"
+BASE=$(basename -- "$SVG")
+BASE=${BASE%.*}
+DZI="${BASE}.dzi"
 : ${DEST:="$2"}
-: ${DEST:="$B"}
-: ${PNG:="${DEST}/${B}.png"}
+: ${DEST:="$BASE"}
+: ${PNG:="${DEST}/${BASE}.png"}
 : ${TEMPLATE:="$(pwd)/presentation_template.html"}
 
 # If true, only the metadata are processed
@@ -175,8 +175,8 @@ create_png() {
 }
 
 create_deepzoom() {
-    if [[ -d "${DEST}/${B}_files" ]]; then
-        echo "- Skipping DeepZoom tile generation as '${DEST}/${B}_files' already exists"
+    if [[ -d "${DEST}/${BASE}_files" ]]; then
+        echo "- Skipping DeepZoom tile generation as '${DEST}/${BASE}_files' already exists"
         return
     fi
 
@@ -195,14 +195,14 @@ create_deepzoom() {
     fi
     if [[ "true" == "$VIPS_DIRECT" ]]; then
         local DPI=$(get_dpi)
-        echo "- Generating DeepZoom tiles in ${DEST}/${B}_files using vips from SVG with DPI=${DPI}"
+        echo "- Generating DeepZoom tiles in ${DEST}/${BASE}_files using vips from SVG with DPI=${DPI}"
         pushd "$DEST" > /dev/null
-        vips dzsave "${SVG_ABSOLUTE}[dpi=${DPI},unlimited]" ${B} --suffix .$FORMAT
+        vips dzsave "${SVG_ABSOLUTE}[dpi=${DPI},unlimited]" ${BASE} --suffix .$FORMAT
         popd > /dev/null
     else
-        echo "- Generating DeepZoom tiles in ${DEST}/${B}_files using vips from PNG"
+        echo "- Generating DeepZoom tiles in ${DEST}/${BASE}_files using vips from PNG"
         pushd "$DEST" > /dev/null
-        vips dzsave ${PNG_ABSOLUTE} ${B} --suffix .$FORMAT
+        vips dzsave ${PNG_ABSOLUTE} ${BASE} --suffix .$FORMAT
         popd > /dev/null
     fi
 }
@@ -534,7 +534,7 @@ copy_files() {
     unzip -q -o -j -d "$DEST/resources/" "$SCRIPT_HOME/osd/openseadragon-bin-${OSD_VERSION}.zip" ${OSD_ZIP%.*}/openseadragon.min.js
     unzip -q -o -j -d "$DEST/resources/images/" "$SCRIPT_HOME/osd/openseadragon-bin-${OSD_VERSION}.zip" $(unzip -l "$SCRIPT_HOME/osd/openseadragon-bin-"*.zip | grep -o "opensea.*.png" | tr '\n' ' ')
 
-    ctemplate "$TEMPLATE" > "$DEST/index.html"
+    NODES=$(wc -l < "$DAT_TEXT") EDGES=$(grep '<path ' "$SVG" | wc -l) ctemplate "$TEMPLATE" > "$DEST/index.html"
 }
 
 ###############################################################################
