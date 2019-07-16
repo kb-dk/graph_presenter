@@ -17,7 +17,8 @@ pushd ${BASH_SOURCE%/*} > /dev/null
 SCRIPT_HOME="$(pwd)"
 
 : ${SVG:="$1"}
-B=${SVG%.*}
+B=$(basename -- "$SVG")
+B=${B%.*}
 DZI="${B}.dzi"
 : ${DEST:="$2"}
 : ${DEST:="$B"}
