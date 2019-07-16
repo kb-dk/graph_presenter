@@ -238,6 +238,47 @@ function linksIndexesFromNode(node, visitIn=defaultVisitIn, visitOut=defaultVisi
 }
 
 /*
+Ensures that all nodes as given with indexes are visible
+*/
+function zoomToNodes(indexes) {
+    var minX = 1;
+    var maxX = 0;
+    var minY = 1;
+    var maxY = 0;
+    for (var i = 0; i < indexes.length; i++) {
+        var domain = domains[indexes[i]];
+        
+        var rx = (domain.x - viewbox.x1)/viewbox.x2;
+        var ry = (domain.y - viewbox.y1)/viewbox.x2;
+
+        if (rx < minX) {
+            minX = rx;
+        }
+        if (rx > maxX) {
+            maxX = rx;
+        }
+        if (ry < minY) {
+            minY = ry;
+        }
+        if (ry > maxY) {
+            maxY = ry;
+        }
+    }
+
+    if (indexes.length > 0) {
+        var worldW = myDragon.world.getItemAt(0).getContentSize().x;
+        var boundsMargin = baseMargin/worldW;
+        minX -= boundsMargin;
+        minY -= boundsMargin;
+        maxX += boundsMargin;
+        maxY += boundsMargin;
+        myDragon.viewport.fitBoundsWithConstraints(new OpenSeadragon.Rect(minX, minY, maxX-minX, maxY-minY));
+    } else {
+        myDragon.viewport.fitHorizontally().fitVertically();
+    }
+}
+
+/*
 Visually marks the domains for all given indexes.
 */
 function markChosen(indexes, matched, heavyLimit, normalLimit, radiusFactor, heavyClass, normalClass, callback) {
@@ -731,6 +772,7 @@ function markShortestPath(sourceName, destName) {
     if (path) {
         message("Shortest path: " + pathToText(path), " in " + ms + "ms");
         markPath(path, connectStrokeWidth);
+        zoomToNodes(path);
     } else {
         message("Unable to find path from '" + sourceName + "' to '" + destName, "' in " + ms + "ms");
     }
