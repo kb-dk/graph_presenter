@@ -23,7 +23,7 @@ DZI="${B}.dzi"
 : ${DEST:="$2"}
 : ${DEST:="$B"}
 : ${PNG:="${DEST}/${B}.png"}
-: ${TEMPLATE:="presentation_template.html"}
+: ${TEMPLATE:="$(pwd)/presentation_template.html"}
 
 # If true, only the metadata are processed
 # Use vips for generating both PNG and tiles.
