@@ -29,9 +29,9 @@ DZI="${BASE}.dzi"
 # Use vips for generating both PNG and tiles.
 # Important: This fails for renders > 32Kx32K unless a suitable new version of vips is used.
 # See https://github.com/libvips/libvips/issues/1354 for details
-: ${VIPS_ONLY:="false"}
+: ${VIPS_ONLY:="auto"} # auto means true if vips-version is 8.9+, else false
 
-: ${RENDER_PNG:="true"}
+: ${RENDER_PNG:="auto"} # false, true, auto (only if needed for tiles)
 : ${RENDER_TILES:="true"}
 : ${RENDER_META:="true"}
 
@@ -89,10 +89,6 @@ check_parameters() {
     mkdir -p "$DEST"
 
     local MISSING=false
-    if [[ "false" == "$VIPS_ONLY" && .$(which gm) == . ]]; then
-        >&2 echo "Error: 'gm' (GraphicsMagic) not available, please install it"
-        MISSING=true
-    fi
     if [[ .$(which vips) == . ]]; then
         if [[ "true" == "$RENDER_TILES" ]]; then
             >&2 echo "Error: 'vips' not available, please install it"
@@ -105,10 +101,40 @@ check_parameters() {
     if [[ "true" == "$MISSING" ]]; then
         usage 2
     fi
+
     if [[ .$(which xmllint) == . ]]; then
         >&2 echo "Error: 'xmllint' not available, please install it"
         usage 3
     fi
+
+    if [[ "auto" == "$VIPS_ONLY" ]]; then
+        # vips 8.9 can handle large SVGs, both input and output
+        # See https://github.com/libvips/libvips/issues/732
+        # and https://github.com/libvips/libvips/issues/1354
+        local V=$(vips -v | grep -o '[0-9]\+[.][0-9]\+[.][0-9]\+')
+        local VE=(${V//./ })
+        if [[ ${VE[0]} -gt 8 || ( ${VE[0]} -eq 8 && ${VE[1]} -ge 9) ]]; then
+            echo "- VIPS_ONLY==auto and vips version $V >= 8.9.0. Setting VIPS_ONLY=true"
+            VIPS_ONLY=true
+        else
+            echo "- VIPS_ONLY==auto and vips version $V < 8.9.0. Setting VIPS_ONLY=false"
+            VIPS_ONLY=false
+        fi
+    fi
+
+    if [[ "$RENDER_PNG" == "auto" ]]; then
+        if [[ "$VIPS_ONLY" == "true" ]]; then
+            echo "- VIPS_ONLY==true and RENDER_PNG==auto. Setting RENDER_PNG=false"
+        else 
+            echo "- VIPS_ONLY==false and RENDER_PNG==auto. Setting RENDER_PNG=true"
+        fi
+    fi
+    
+    if [[ "false" == "$VIPS_ONLY" && .$(which gm) == . ]]; then
+        >&2 echo "Error: 'gm' (GraphicsMagic) not available, please install it"
+        MISSING=true
+    fi
+
     SVG_ABSOLUTE=$(echo "$(cd "$(dirname "$SVG")"; pwd)/$(basename "$SVG")")
     PNG_ABSOLUTE=$(echo "$(cd "$(dirname "$PNG")"; pwd)/$(basename "$PNG")")
 }
@@ -542,8 +568,8 @@ copy_files() {
 ###############################################################################
 
 S_START=$(date +%s)
-check_parameters "$@"
 echo "Starting processing of $SVG $(date +"%Y-%m%d %H:%M")"
+check_parameters "$@"
 
 if [[ "true" == "$RENDER_PNG" ]]; then
     create_png
