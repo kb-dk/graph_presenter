@@ -877,6 +877,17 @@ var domainSelectorToInput = document.getElementById("domain-selector-to");
 var searchTypeSelect = document.getElementById("search-type");
 var directionSelect = document.getElementById("connect-direction");
 
+// Remove loading message and show search box
+var loader = document.getElementById("loader");
+if (loader) {
+    loader.parentNode.removeChild(loader);
+}
+var searchbox = document.getElementById("searchbox");
+if (searchbox) {
+    searchbox.style.visibility = 'visible';
+}
+
+// Connect events to GUI
 if (typeof myDragon == 'undefined') {
     console.error("Error: The variable 'myDragon' is not set. Unable to provide visual domain marking");
 } else if (typeof domains == 'undefined') {

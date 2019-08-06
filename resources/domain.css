@@ -22,22 +22,6 @@ a:link 		{ color: #33f; }
 a:visited 	{ color: #808; }
 a:active 	{ color: #f00; }
 
-#loader {
-    position: absolute;
-    left: 20%;
-    top: 20%;
-    width: 60%;
-    height: 4em;
-    font-size: 5em;
-    text-align: center;
-    padding-top: 2.5em;
-    z-index: 400;
-    border: 10px solid blue;
-    border-radius: 50%;
-    background: white;
-    opacity: 0.9;
-}
-
 #pageheader {
     position: absolute;
     width: 100%;
@@ -94,9 +78,22 @@ a:active 	{ color: #f00; }
     color: black;
     pointer-events: all;
 }
-#searchbox, #collapsor {
+#searchbox, #collapsor, #loader {
     color: #32611F;
     z-index: 100;
+}
+#searchbox {
+    visibility: hidden;
+}
+#loader {
+    visibility: visible;
+    font-weight: bold;
+    animation: loader-color 2s linear infinite;
+}
+@keyframes loader-color {
+    0%   { color: red; }
+    50%   { color: black; }
+    100%   { color: red; }
 }
 
 #svg-overlay {
