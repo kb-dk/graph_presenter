@@ -729,6 +729,40 @@ function markShortestPath(sourceName, destName, clearOverlays = true) {
 // Action handlers
 // **************************************************
 
+var stateToURL = function() {
+    var posJSON = 'type=' + state.searchType + ';overlay=' + state.showOverlay +
+        ';mark=' + state.markDomainsMatching + ';source=' + state.sourceNode + ';dest=' + state.destNode +
+        ';selected=' + state.selectedNodes.toString();
+    if (window.history.replaceState) {
+        newLoc = window.location.href.replace(/#.*/, "") + '#' + posJSON;
+        window.history.replaceState({ }, document.title, newLoc);
+    }
+}
+
+// .../index.html#type=search;overlay=true;mark=;source=hvam.eu;dest=;selected=128,168
+var URLToState = function() {
+    // TODO: Update type, source and dest without firing events
+    //    var myRegexp = /.*#type=([^;]+);overlay=([^;]+);mark=([^;]+);source=([^;]*);dest=([^;]*);selected=([^;]*)/
+    var myRegexp = /.*#type=([^;]+);overlay=([^;]+);mark=([^;]*);source=([^;]*);dest=([^;]*);selected=([^;]*)/
+    var match = myRegexp.exec(window.location.href);
+    if (match) {
+        console.log("Restoring state from URL hash");
+        state.searchType = match[1];
+        state.showOverlay = match[2];
+        state.markDomainsMatching = match[3];
+        state.sourceNode = match[4];
+        state.destNode = match[5];
+        if (match[6] != '') {
+            var nodeIDs = match[6].split(",");
+            state.selectedNodes = [];
+            for (var i = 0 ; i < nodeIDs.length ; i++) {
+                state.selectedNodes.push(Number(nodeIDs[i]));
+            }
+        }
+        fireStateChange();
+    }
+}
+
 var handleStateChange = function() {
     clearAllOverlays(); // FIXME: Quite clumsy to freeze the OpenSeadragon instance this way
 
@@ -760,8 +794,7 @@ var handleStateChange = function() {
     if (state.markDomainsMatching != '') {
         markMatching(state.markDomainsMatching, false);
     }
-    
-    // ###
+    stateToURL();
 }
 
 // searchType: search|connect
@@ -942,4 +975,5 @@ if (typeof myDragon == 'undefined') {
         var domainFeedback = new Object(); // Dummy
         console.log("Warning: Unable to locate an element with id 'domain-feedback': Feedback on domain matching is disabled");
     }
+    myDragon.viewport.viewer.addHandler("open", URLToState);
 }
