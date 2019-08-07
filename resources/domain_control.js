@@ -16,6 +16,10 @@ var illegalNodesForShortestPath = ["google.com", "google.dk", "facebook.com", "b
 // The search mode. Valid values: 'search' and 'connect'
 var searchType = 'search';
 
+// **************************************************
+// SVGOverlay processing
+// **************************************************
+
 var svg = null;
 var diffusor = null;
 var svgString = '';
@@ -79,20 +83,6 @@ function getSVGText(domain) {
     return '<text font-size="' + domain.fs + '" x="' + domain.x + '" y="' + domain.y + '" style="pointer-events:none; text-anchor: middle; dominant-baseline: central;" font-family="' + textfont + '">' + domain.d + '</text>';
 }
 
-function getDomainColor(domain) {
-    if (!domain.out) {
-        return "cccccc";
-    }        
-    var links = domain.out.length == 0 ? domain.in : domain.out;
-    if (links.length == 0) {
-        console.log("No links");
-        return "cccccc";
-    }
-    /* 222(-589.385315,-193.555618~-604.705933,-255.864410#c0c0c0);123... */
-    var tokens = links.split(";")[0].split('#');
-    return tokens.length > 1 ? tokens[1].replace(')', '') : "cccccc";
-}
-
 function drawCircles(links, isInLinks) {
     var svgCircles = '';
     for (var i = 0 ; i < links.length ; i++) {
@@ -106,6 +96,7 @@ function drawCircles(links, isInLinks) {
     updateSVGOverlay(svgCircles);
 }
 
+// Marks node and links from and to the node by updating the SVGOverlay
 function markLinks(domainName, domainIndex, clearPrevious) {
     if (clearPrevious) {
         myDragon.clearOverlays();
@@ -131,21 +122,111 @@ function markLinks(domainName, domainIndex, clearPrevious) {
     /* Draw self-circle */
     updateSVGOverlay(getSVGCircle(domain, getDomainColor(domain)));
     updateSVGOverlay(getSVGText(domain));
-    
-    /* Mark in-links */
-/*    markChosen(linksIndexes(domains[domainIndex].in), 1, heavyMarked, maxMarked, radiusFactor, "domain-overlay-mimick", "domain-overlay-mimick", function(elt, domainName, domainIndex) {
-        elt.onclick = function() {
-            markLinks(domainName, domainIndex);
+}
+
+/*
+Visually marks the domains for all given indexes.
+*/
+function markChosen(indexes, matched, heavyLimit, normalLimit, radiusFactor, heavyClass, normalClass, callback) {
+    var minX = 1;
+    var maxX = 0;
+    var minY = 1;
+    var maxY = 0;
+    var added = [];
+    var arrayLength = indexes.length; // domains is defined in domains.js
+    for (var i = 0; i < arrayLength; i++) {
+        var domain = domains[indexes[i]];
+
+        matched++;
+        if (matched == heavyLimit+1) { // Exceeded. Convert to passive marking
+            var l = added.length;
+            for (var i = 0; i < l; i++) {
+                added[i].className = normalClass;
+            }
         }
-    });*/
-    /* Mark out-links */
-/*    markChosen(linksIndexes(domains[domainIndex].out), 1 + linksIndexes(domains[domainIndex].in).length, heavyMarked, maxMarked, radiusFactor, "domain-overlay-mimick", "domain-overlay-mimick", function(elt, domainName, domainIndex) {
-        elt.onclick = function() {
-            markLinks(domainName, domainIndex);
+        if (matched > normalLimit) {
+            continue;
         }
-    });*/
-    /* Mark self */
-//    markChosen([domainIndex], 0, heavyMarked, maxMarked, radiusFactor, "domain-overlay", "domain-overlay-hp");
+        
+        var rx = (domain.x - viewbox.x1)/viewbox.x2;
+        var ry = (domain.y - viewbox.y1)/viewbox.x2;
+        var w = domain.r*radiusFactor;
+
+        if (rx < minX) {
+            minX = rx;
+        }
+        if (rx > maxX) {
+            maxX = rx;
+        }
+        if (ry < minY) {
+            minY = ry;
+        }
+        if (ry > maxY) {
+            maxY = ry;
+        }
+        var elt = document.createElement("div");
+        elt.id = "domain-overlay-" + matched;
+        elt.className = matched > heavyLimit ? normalClass : heavyClass;
+        elt.setAttribute('title', domain.d + " (in=" + linksIndexes(domain.in).length + ", out=" + linksIndexes(domain.out).length + ")");
+        elt.domain = domain.d;
+        elt.domainIndex = indexes[i];
+        if (callback) {
+            callback(elt, elt.domain, elt.domainIndex);
+        }
+        myDragon.addOverlay({
+            element: elt,
+            location: new OpenSeadragon.Rect(rx-w/2, ry-w/2, w, w),
+            placement: OpenSeadragon.Placement.TOP_LEFT // FIXME: placement seems to be without effect!?
+        });
+        added.push(elt);
+    }
+    return {"minX": minX, "maxX": maxX, "minY": minY, "maxY": maxY, "matched": matched}
+}
+
+// Given an array of indexes, mark all nodes and the immediate paths between subsequent nodes
+function markPath(nodeIndexes, strokeWidth = browseStrokeWidth) {
+    clearSVGOverlay();
+    // Links first
+    for (var i = 0 ; i < nodeIndexes.length ; i++) {
+        var node = domains[nodeIndexes[i]];
+        if (i < nodeIndexes.length-1) {
+            drawLinks(getLinkBetween(nodeIndexes[i], nodeIndexes[i+1]), strokeWidth);
+        }
+    }
+    // Nodes second (so that they are displayed on top of links)
+    for (var i = 0 ; i < nodeIndexes.length ; i++) {
+        var node = domains[nodeIndexes[i]];
+        updateSVGOverlay(getSVGCircle(node) + getSVGText(node));
+    }
+//        console.log(path[i] + ": " + domains[path[i]].d);
+}
+
+// **************************************************
+// Node data extraction
+// **************************************************
+
+function isNodeIndexInLinks(linksString, nodeIndex) {
+    var li = linksIndexes(linksString);
+    for (var i = 0 ; i < li.length ; i++) {
+        if (li[i] == nodeIndex) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function getDomainColor(domain) {
+    if (!domain.out) {
+        return "cccccc";
+    }        
+    var links = domain.out.length == 0 ? domain.in : domain.out;
+    if (links.length == 0) {
+        console.log("No links");
+        return "cccccc";
+    }
+    /* 222(-589.385315,-193.555618~-604.705933,-255.864410#c0c0c0);123... */
+    var tokens = links.split(";")[0].split('#');
+    return tokens.length > 1 ? tokens[1].replace(')', '') : "cccccc";
 }
 
 /*
@@ -226,6 +307,7 @@ function linksIndexes(linksString) {
     }
     return indexes;
 }
+
 function linksIndexesFromNode(node, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
     var links = [];
     if (visitIn) {
@@ -237,9 +319,34 @@ function linksIndexesFromNode(node, visitIn=defaultVisitIn, visitOut=defaultVisi
     return links;
 }
 
-/*
-Ensures that all nodes as given with indexes are visible
-*/
+function getLinkBetween(sourceIndex, destIndex) {
+    var links = expandAllLinks(sourceIndex);
+    for (var i = 0 ; i < links.length ; i++) {
+        if (links[i].destIndex == destIndex || links[i].sourceIndex == destIndex) {
+            return [links[i]];
+        }
+    }
+    return [];
+}
+
+function pathToText(path) {
+    var s = domains[path[0]].d;
+    for (var i = 0 ; i < path.length-1 ; i++) {
+        var sourceDomain = domains[path[i]];
+        var outLink = isNodeIndexInLinks(sourceDomain.out, path[i+1]);
+        var inLink = isNodeIndexInLinks(sourceDomain.in, path[i+1]);
+        s += outLink && inLink ? " ↔ " : inLink ? " ← " : outLink ? " → " : " ? ";
+        s += domains[path[i+1]].d;
+    }
+    return s;
+}
+
+
+// **************************************************
+// Viewport handling
+// **************************************************
+
+// Ensures that all nodes as given with indexes are visible
 function zoomToNodes(indexes) {
     var minX = 1;
     var maxX = 0;
@@ -278,98 +385,12 @@ function zoomToNodes(indexes) {
     }
 }
 
-/*
-Visually marks the domains for all given indexes.
-*/
-function markChosen(indexes, matched, heavyLimit, normalLimit, radiusFactor, heavyClass, normalClass, callback) {
-    var minX = 1;
-    var maxX = 0;
-    var minY = 1;
-    var maxY = 0;
-    var added = [];
-    var arrayLength = indexes.length; // domains is defined in domains.js
-    for (var i = 0; i < arrayLength; i++) {
-        var domain = domains[indexes[i]];
 
-        matched++;
-        if (matched == heavyLimit+1) { // Exceeded. Convert to passive marking
-            var l = added.length;
-            for (var i = 0; i < l; i++) {
-                added[i].className = normalClass;
-            }
-        }
-        if (matched > normalLimit) {
-            continue;
-        }
-        
-        var rx = (domain.x - viewbox.x1)/viewbox.x2;
-        var ry = (domain.y - viewbox.y1)/viewbox.x2;
-        var w = domain.r*radiusFactor;
+// **************************************************
+// Major fuctionality
+// **************************************************
 
-        if (rx < minX) {
-            minX = rx;
-        }
-        if (rx > maxX) {
-            maxX = rx;
-        }
-        if (ry < minY) {
-            minY = ry;
-        }
-        if (ry > maxY) {
-            maxY = ry;
-        }
-        var elt = document.createElement("div");
-        elt.id = "domain-overlay-" + matched;
-        elt.className = matched > heavyLimit ? normalClass : heavyClass;
-        elt.setAttribute('title', domain.d + " (in=" + linksIndexes(domain.in).length + ", out=" + linksIndexes(domain.out).length + ")");
-        elt.domain = domain.d;
-        elt.domainIndex = indexes[i];
-        if (callback) {
-            callback(elt, elt.domain, elt.domainIndex);
-        }
-        myDragon.addOverlay({
-            element: elt,
-            location: new OpenSeadragon.Rect(rx-w/2, ry-w/2, w, w),
-            placement: OpenSeadragon.Placement.TOP_LEFT // FIXME: placement seems to be without effect!?
-        });
-        added.push(elt);
-    }
-    return {"minX": minX, "maxX": maxX, "minY": minY, "maxY": maxY, "matched": matched}
-}
-
-function getLinkBetween(sourceIndex, destIndex) {
-    var links = expandAllLinks(sourceIndex);
-    for (var i = 0 ; i < links.length ; i++) {
-        if (links[i].destIndex == destIndex || links[i].sourceIndex == destIndex) {
-            return [links[i]];
-        }
-    }
-    return [];
-}
-
-/*
-Given an array of indexes, mark all nodex and the immediate paths between subsequent nodes
-*/
-function markPath(nodeIndexes, strokeWidth = browseStrokeWidth) {
-    clearSVGOverlay();
-    // Links first
-    for (var i = 0 ; i < nodeIndexes.length ; i++) {
-        var node = domains[nodeIndexes[i]];
-        if (i < nodeIndexes.length-1) {
-            drawLinks(getLinkBetween(nodeIndexes[i], nodeIndexes[i+1]), strokeWidth);
-        }
-    }
-    // Nodes second (so that they are displayed on top of links)
-    for (var i = 0 ; i < nodeIndexes.length ; i++) {
-        var node = domains[nodeIndexes[i]];
-        updateSVGOverlay(getSVGCircle(node) + getSVGText(node));
-    }
-//        console.log(path[i] + ": " + domains[path[i]].d);
-}
-
-/*
-Performs a sequential search through all domains, visually marking the ones that has the given domainInfix
-*/
+// Performs a sequential search through all domains, visually marking the ones that has the given domainInfix
 function markMatching(domainInfix) {
     myDragon.clearOverlays(); // FIXME: Quite clumsy to freeze the OpenSeadragon instance this way
     if (domainInfix.length < 1) {
@@ -440,9 +461,7 @@ function getShortest(unvisited) {
     return entryKey;
 }
 
-/*
-Returns indexes for illegalNodesForShortestPath, ensuring that they don't appear in the path
-*/
+// Returns indexes for illegalNodesForShortestPath, ensuring that they don't appear in the path
 var initialIllegalVisits = null;
 function getIllegalVisits() {
     if (initialIllegalVisits == null) {
@@ -629,28 +648,6 @@ function message(m, mlog) {
     domainFeedback.innerHTML = m;
 }
 
-function isNodeIndexInLinks(linksString, nodeIndex) {
-    var li = linksIndexes(linksString);
-    for (var i = 0 ; i < li.length ; i++) {
-        if (li[i] == nodeIndex) {
-            return true;
-        }
-    }
-    return false;
-}
-
-function pathToText(path) {
-    var s = domains[path[0]].d;
-    for (var i = 0 ; i < path.length-1 ; i++) {
-        var sourceDomain = domains[path[i]];
-        var outLink = isNodeIndexInLinks(sourceDomain.out, path[i+1]);
-        var inLink = isNodeIndexInLinks(sourceDomain.in, path[i+1]);
-        s += outLink && inLink ? " ↔ " : inLink ? " ← " : outLink ? " → " : " ? ";
-        s += domains[path[i+1]].d;
-    }
-    return s;
-}
-
 function markShortestPath(sourceName, destName) {
     var start = window.performance.now();
     myDragon.clearOverlays();
@@ -706,6 +703,11 @@ function markShortestPath(sourceName, destName) {
     }
 }
 
+
+// **************************************************
+// Action handlers
+// **************************************************
+
 var animationCallback = null;
 
 var domainChanged = function(e) {
@@ -755,7 +757,6 @@ var searchTypeChanged = function(e) {
     default:
         console.log("Error: Unknown search type '" + searchType + "'");
     }
-    
 }
 
 function clickedNode(domain, domainIndex, shift) {
@@ -779,6 +780,24 @@ function clickedOutsideNodes(shift) {
         clearSVGOverlay();
     }
 }
+
+// **************************************************
+// Startup procedures
+// **************************************************
+
+// Remove loading message and show search box
+var loader = document.getElementById("loader");
+if (loader) {
+    loader.parentNode.removeChild(loader);
+}
+var searchbox = document.getElementById("searchbox");
+if (searchbox) {
+    searchbox.style.visibility = 'visible';
+}
+
+// **************************************************
+// Connections to GUI and event-catching
+// **************************************************
 
 var canvasClicked = function(info) {
     if (!info.quick) { // info.quick = not dragged
@@ -804,18 +823,6 @@ var domainSelectorInput = document.getElementById("domain-selector");
 var domainSelectorToInput = document.getElementById("domain-selector-to");
 var searchTypeSelect = document.getElementById("search-type");
 var directionSelect = document.getElementById("connect-direction");
-
-// Remove loading message and show search box
-var loader = document.getElementById("loader");
-if (loader) {
-    loader.parentNode.removeChild(loader);
-}
-var searchbox = document.getElementById("searchbox");
-if (searchbox) {
-    searchbox.style.visibility = 'visible';
-}
-
-// Connect events to GUI
 if (typeof myDragon == 'undefined') {
     console.error("Error: The variable 'myDragon' is not set. Unable to provide visual domain marking");
 } else if (typeof domains == 'undefined') {
