@@ -440,51 +440,6 @@ function getShortest(unvisited) {
     return entryKey;
 }
 
-function traverse(visited, unvisited, destIndex, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
-    var sourceIndex = getShortest(unvisited);
-//    console.log("Traversing with visited=" + visited.size + ", unvisited=" + unvisited.size + ", shortest=" + sourceIndex);
-    if (sourceIndex == null) {
-        return "EON"; // No more nodes
-    }
-    
-    var sourceValue = unvisited.get(sourceIndex);
-    var path = updateUnvisitedLinks(visited, unvisited, sourceIndex, destIndex, sourceValue.dist, sourceValue.path, visitIn, visitOut);
-    // https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm#Algorithm step 4
-    visited.add(sourceIndex);
-    unvisited.delete(sourceIndex);
-    return path ? path : "";
-}
-
-// https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm#Algorithm step 3
-// Returns path if the destination node has been reached
-function updateUnvisitedLinks(visited, unvisited, sourceIndex, destIndex, sourceDist, sourcePath, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
-    var links = [];
-    if (visitIn) {
-        links = links.concat(linksIndexes(domains[sourceIndex].in));
-    }
-    if (visitOut) {
-        links = links.concat(linksIndexes(domains[sourceIndex].out));
-    }
-    for (var i = 0 ; i < links.length ; i++) {
-        var nodeIndex = Number(links[i]); // nodeIndex is a string and type matters for Set & map
-        
-        if (visited.has(nodeIndex)) { 
-            continue;
-        }
-        var n = unvisited.get(nodeIndex);
-        if (n && n.dist <= sourceDist+1) {
-            continue
-        }
-        var nPath = sourcePath.length == 0 ? [] : sourcePath.slice(0);
-        nPath.push(nodeIndex);
-        if (nodeIndex == destIndex) {
-            return nPath;
-        }
-        unvisited.set(nodeIndex, {dist: sourceDist+1, path: nPath});
-    }
-    return undefined;
-}
-
 /*
 Returns indexes for illegalNodesForShortestPath, ensuring that they don't appear in the path
 */
@@ -509,33 +464,6 @@ function getIllegalVisits() {
         }
     }
     return new Set(initialIllegalVisits);
-}
-
-/*
-Finds the shortest path between two nodes, using Dijkstra's algorithm O(n^2)
-While O(n^2) sounds problematic, only insanely interlinked graphs should take a long time and a lot of memory
-Note: illegalNodesForShortestPath holds a list of domains to ignore when doing traversal: It is not very 
-      interesting to see that a & b are connected by linking to google.com
-*/
-function findShortestPathObjects(sourceIndex, destIndex, visitIn=defaultVisitIn, visitOut=defaultVisitOut) {
-    var visited = getIllegalVisits();
-    visited.delete(sourceIndex);
-    visited.delete(destIndex);
-    var unvisited = new Map();
-    var path;
-    if (sourceIndex == destIndex) {
-        console.log("Source == destination");
-        return;
-    }
-    
-    unvisited.set(sourceIndex, {dist: 0, path: [sourceIndex]});
-    path = updateUnvisitedLinks(visited, unvisited, sourceIndex, destIndex, 0, [sourceIndex], visitIn, visitOut);
-    if (path) {
-        return path == "EON" ? undefined : path;
-    }
-
-    while ((path = traverse(visited, unvisited, destIndex, visitIn, visitOut)) == "");
-    return !path || path == "EON" ? undefined : path;
 }
 
 /*
