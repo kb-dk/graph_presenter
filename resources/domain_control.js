@@ -13,12 +13,16 @@ var defaultVisitOut = true;
 // Which nodes to ignore when calculating shortest path
 var illegalNodesForShortestPath = ["google.com", "google.dk", "facebook.com", "bing.com", "twitter.com", "wikipedia.dk", "wikipedia.org", "wordpress.com"];
 
-// The search mode. Valid values: 'search' and 'connect'
-var searchType = 'search';
-
 // **************************************************
 // SVGOverlay processing
 // **************************************************
+
+function clearAllOverlays() {
+    myDragon.clearOverlays();
+    diffusor = '';
+    svgString = '';
+    svg = null;
+}
 
 var svg = null;
 var diffusor = null;
@@ -39,6 +43,12 @@ function createSVGOverlay() {
         location: myDragon.viewport.getHomeBounds()
     });
     svgString = '';
+}
+
+function ensureSVGOverlay() {
+    if (!diffusor) {
+        createSVGOverlay();
+    }
 }
 
 function clearSVGOverlay() {
@@ -99,11 +109,9 @@ function drawCircles(links, isInLinks) {
 // Marks node and links from and to the node by updating the SVGOverlay
 function markLinks(domainName, domainIndex, clearPrevious) {
     if (clearPrevious) {
-        myDragon.clearOverlays();
+        clearAllOverlays();
     }
-    if (document.getElementById("domain-selector")) {
-        document.getElementById("domain-selector").value = " " + domainName + " ";
-    }
+    //domainSelectorInput.value = " " + domainName + " ";
     var worldW = myDragon.world.getItemAt(0).getContentSize().x;
     var radiusFactor = baseRadius/worldW;
 
@@ -391,8 +399,10 @@ function zoomToNodes(indexes) {
 // **************************************************
 
 // Performs a sequential search through all domains, visually marking the ones that has the given domainInfix
-function markMatching(domainInfix) {
-    myDragon.clearOverlays(); // FIXME: Quite clumsy to freeze the OpenSeadragon instance this way
+function markMatching(domainInfix, clearOverlays = true) {
+    if (clearOverlays) {
+        clearAllOverlays(); // FIXME: Quite clumsy to freeze the OpenSeadragon instance this way
+    }
     if (domainInfix.length < 1) {
         myDragon.viewport.fitHorizontally().fitVertically();
         domainFeedback.innerHTML = "";
@@ -648,33 +658,44 @@ function message(m, mlog) {
     domainFeedback.innerHTML = m;
 }
 
-function markShortestPath(sourceName, destName) {
-    var start = window.performance.now();
-    myDragon.clearOverlays();
-    clearSVGOverlay();
-    createSVGOverlay();
-    
-    sourceName = sourceName.trim();
-    destName = destName.trim();
-    // TODO: If there is no destination, just mark the source node without links
+// in:  node names
+// out: node indexes or -1 if not matchied
+function findNodeIndexes(source, destination) {
     var sourceIndex = -1;
     var destIndex = -1;
-    var arrayLength = domains.length;
-    for (var i = 0; i < arrayLength; i++) {
-        var domainName = domains[i].d;
-        if (domainName == sourceName) {
-            sourceIndex = i;
-            if (destIndex != -1) {
-                break;
+    if (source != '' || destination != '') {
+        var arrayLength = domains.length;
+        for (var i = 0; i < arrayLength; i++) {
+            var domainName = domains[i].d;
+            if (domainName == source) {
+                sourceIndex = i;
+                if (destIndex != -1 || destination == '') {
+                    break;
+                }
             }
-        }
-        if (domainName == destName) {
-            destIndex = i;
-            if (sourceIndex != -1) {
-                break;
+            if (domainName == destination) {
+                destIndex = i;
+                if (sourceIndex != -1 || sourceIndex == '') {
+                    break;
+                }
             }
         }
     }
+    return {sourceIndex: sourceIndex, destIndex: destIndex};
+}
+
+function markShortestPath(sourceName, destName, clearOverlays = true) {
+    var start = window.performance.now();
+    if (clearOverlays) {
+        clearAllOverlays();
+    };
+    ensureSVGOverlay();
+    
+    sourceName = sourceName.trim();
+    destName = destName.trim();
+    var nodeIndexes = findNodeIndexes(sourceName, destName);
+    sourceIndex = nodeIndexes.sourceIndex;
+    destIndex = nodeIndexes.destIndex;
     if (sourceIndex != -1) {
         updateSVGOverlay(getSVGCircle(domains[sourceIndex]));
     }
@@ -708,76 +729,137 @@ function markShortestPath(sourceName, destName) {
 // Action handlers
 // **************************************************
 
-var animationCallback = null;
+var handleStateChange = function() {
+    clearAllOverlays(); // FIXME: Quite clumsy to freeze the OpenSeadragon instance this way
 
-var domainChanged = function(e) {
-    if (animationCallback != null) {
-        window.cancelAnimationFrame(animationCallback);
-    }
-    var domainInput = domainSelectorInput.value.toLowerCase();
-    animationCallback = window.requestAnimationFrame(function(timestamp) {
-        switch (searchType) {
-        case "search":
-            markMatching(domainInput);
-            break;
-        case "connect":
-            markMatching(domainInput);
-            var domainToInput = domainSelectorToInput.value.toLowerCase();
-            markShortestPath(domainInput, domainToInput);
-            break;
-        }
-    });
-}
-var domainToChanged = function(e) {
-    if (animationCallback != null) {
-        window.cancelAnimationFrame(animationCallback);
-    }
-    var domainInput = domainSelectorInput.value.toLowerCase();
-    var domainToInput = domainSelectorToInput.value.toLowerCase();
-    message("Finding shortest path from '" + domainInput + "' to '" + domainToInput + "'...");
-    animationCallback = window.requestAnimationFrame(function(timestamp) {
-        markMatching(domainToInput);
-        markShortestPath(domainInput, domainToInput);
-    });
-}
-
-var searchTypeChanged = function(e) {
-    searchType = document.getElementById("search-type").value;
-    switch (searchType) {
+    switch (state.searchType) {
     case "search":
         domainSelectorToInput.style.visibility = 'hidden';
         directionSelect.style.visibility = 'hidden';
-        domainChanged();
-        break
-    case "connect": 
+
+        if (state.showOverlay && state.selectedNodes.length > 0) {
+            ensureSVGOverlay();
+            for (var i = 0 ; i < state.selectedNodes.length ; i++) {
+                markLinks(domains[state.selectedNodes[i]].d, state.selectedNodes[i], false);
+            }
+        }
+        break;
+    case "connect":
         domainSelectorToInput.style.visibility = 'visible';
         directionSelect.style.visibility = 'visible';
-        domainToChanged();
-       break
-    default:
-        console.log("Error: Unknown search type '" + searchType + "'");
+
+        var ni = findNodeIndexes(state.sourceNode, state.destNode);
+        if ((state.showOverlay && (ni.sourceIndex != -1 || ni.destIndex != -1)) ||
+            (ni.sourceIndex != -1 && ni.destIndex != -1)) {
+            ensureSVGOverlay();
+            markShortestPath(state.sourceNode, state.destNode, false);
+        }
+        break;
     }
+
+    if (state.markDomainsMatching != '') {
+        markMatching(state.markDomainsMatching, false);
+    }
+    
+    // ###
+}
+
+// searchType: search|connect
+// showOverlay: true|false // true = show SVG overlay with nodes and edges
+// focus: domainFrom|domainTo|<empty> // domain* = show animated circles for matching nodes
+var state = {
+    searchType: 'search',
+    showOverlay: 'false',
+    markDomainsMatching: '',
+    
+    sourceNode: "",
+    destNode: "",
+    selectedNodes: []
+}
+
+var ignoreFirstNodeChange = false;
+var animationCallback = null;
+var abortStateChange = function() {
+    if (animationCallback != null) {
+        window.cancelAnimationFrame(animationCallback);
+    }
+}
+var fireStateChange = function() {
+    animationCallback = window.requestAnimationFrame(function(timestamp) {
+        handleStateChange();
+    });
+}
+
+var sourceNodeChanged = function(e) {
+    if (ignoreFirstNodeChange) {
+        ignoreFirstNodeChange = false;
+        return;
+    }
+    abortStateChange();
+    state.sourceNode = domainSelectorInput.value.toLowerCase();
+    state.markDomainsMatching = state.sourceNode;
+    fireStateChange();
+}
+var destNodeChanged = function(e) {
+    if (ignoreFirstNodeChange) {
+        ignoreFirstNodeChange = false;
+        return;
+    }
+    abortStateChange();
+    state.destNode = domainSelectorToInput.value.toLowerCase();
+    state.markDomainsMatching = state.destNode;
+    // TODO: If both != -1 and state.searchType == connect then showOverlay = true?
+    //    message("Finding shortest path from '" + domainInput + "' to '" + domainToInput + "'...");
+    fireStateChange();
+}
+
+var searchTypeChanged = function(e) {
+    abortStateChange();
+    state.searchType = document.getElementById("search-type").value;
+    state.showOverlay = false;
+    state.selectedNodes = [];
+    fireStateChange();
 }
 
 function clickedNode(domain, domainIndex, shift) {
-    switch (searchType) {
+    abortStateChange();
+    switch (state.searchType) {
     case "search":
-        markLinks(domain.d, domainIndex, false);
+        state.sourceNode = domain.d;
+        state.selectedNodes.push(domainIndex);
+        state.showOverlay = true;
+        state.markDomainsMatching = '';
+
+        ignoreFirstNodeChange = true;
+        domainSelectorInput.value = ' ' + state.sourceNode + ' ';
         break;
     case "connect":
         if (!shift) {
-            domainSelectorInput.value = ' ' + domain.d + ' ';
+            state.sourceNode = domain.d;
+            state.markDomainsMatching = false;
+            state.showOverlay = true;
+
+            ignoreFirstNodeChange = true;
+            domainSelectorInput.value = ' ' + state.sourceNode + ' ';
         } else {
-            domainSelectorToInput.value = ' ' + domain.d + ' ';
+            state.destNode = domain.d;
+            state.markDomainsMatching = false;
+            state.showOverlay = true;
+
+            ignoreFirstNodeChange = true;
+            domainSelectorToInput.value = ' ' + state.destNode + ' ';
         }
-        domainToChanged();
         break;
     }
+    fireStateChange();
 }
 
 function clickedOutsideNodes(shift) {
     if (!shift) {
-        clearSVGOverlay();
+        abortStateChange();
+        state.showOverlay = false;
+        state.selectedNodes = [];
+        fireStateChange();
     }
 }
 
@@ -838,19 +920,19 @@ if (typeof myDragon == 'undefined') {
     }
     if (directionSelect) {
         directionSelect.selectedIndex = 0;
-        directionSelect.addEventListener("input", domainToChanged);
+        directionSelect.addEventListener("input", destNodeChanged);
     } else {
         directionSelect = new Object(); // Dummy
         console.log("Warning: Unable to locate connection direction select id 'connect-direction'");
     }
     if (domainSelectorInput) {
-        domainSelectorInput.addEventListener("input", domainChanged);
+        domainSelectorInput.addEventListener("input", sourceNodeChanged);
     } else {
         domainSelectorInput = new Object(); // Dummy
         console.log("Warning: Unable to locate an input field with id 'domain-selector': Domain selection is disabled");
     }
     if (domainSelectorToInput) {
-        domainSelectorToInput.addEventListener("input", domainToChanged);
+        domainSelectorToInput.addEventListener("input", destNodeChanged);
     } else {
         domainSelectorToInput = new Object(); // Dummy
     }
