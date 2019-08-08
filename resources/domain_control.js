@@ -437,7 +437,7 @@ function markMatching(domainInfix, clearOverlays = true) {
             markLinks(domain, domainIndex, true);
         }
     });
-    console.log("Matched " + matched + " nodes (max " + maxMarked + " marked) in " + (new Date().getTime() - startTime) + " ms");
+    console.log("Matched " + matched + " nodes (max " + maxMarked + " marked) for '" + domainInfix + "' in " + (new Date().getTime() - startTime) + " ms");
     var dom = matched == 1 ? " node" : " nodes";
     domainFeedback.innerHTML = matched > maxMarked ?
         "Matched " + matched + dom + " (only " + maxMarked + " highlighted)" :
@@ -733,6 +733,7 @@ var stateToURL = function() {
     var posJSON = 'type=' + state.searchType + ';overlay=' + state.showOverlay +
         ';mark=' + state.markDomainsMatching + ';source=' + state.sourceNode + ';dest=' + state.destNode +
         ';selected=' + state.selectedNodes.toString();
+    console.log("Storing " + posJSON);
     if (window.history.replaceState) {
         newLoc = window.location.href.replace(/#.*/, "") + '#' + posJSON;
         window.history.replaceState({ }, document.title, newLoc);
@@ -869,14 +870,14 @@ function clickedNode(domain, domainIndex, shift) {
     case "connect":
         if (!shift) {
             state.sourceNode = domain.d;
-            state.markDomainsMatching = false;
+            state.markDomainsMatching = '';
             state.showOverlay = true;
 
             ignoreFirstNodeChange = true;
             domainSelectorInput.value = ' ' + state.sourceNode + ' ';
         } else {
             state.destNode = domain.d;
-            state.markDomainsMatching = false;
+            state.markDomainsMatching = '';
             state.showOverlay = true;
 
             ignoreFirstNodeChange = true;
