@@ -48,46 +48,6 @@
         ]});
     </script>
 
-    <!-- Pan and zoom to bookmarked position. Must be before the callback below to avoid timing problems upon open -->
-    <script type="text/javascript">
-        // We store the match immediately so that the MouseTracker does not mess up the initial URL
-        var myRegexp = /.*#x:([0-9.-]+),y:([0-9.-]+),w:([0-9.-]+),h:([0-9.-]+)/
-        var match = myRegexp.exec(window.location.href);
-        
-        var gotoURL = function() {
-          if (match) {
-            var rect = new OpenSeadragon.Rect(parseFloat(match[1]), parseFloat(match[2]), parseFloat(match[3]), parseFloat(match[4]));
-            myDragon.viewport.fitBounds(rect);
-          }
-        }
-        
-        myDragon.viewport.viewer.addHandler("open", gotoURL);
-        window.onhashchange = gotoURL;
-        window.onload = gotoURL;
-    </script>
-
-    <!-- https://github.com/openseadragon/openseadragon/issues/1545 -->
-    <!-- Update URL with position and zoom -->
-    <script type="text/javascript">
-        function precise(x) {
-          return Number.parseFloat(x).toPrecision(4);
-        }
-        var tracker = new OpenSeadragon.MouseTracker({
-          element: myDragon.container,
-          moveHandler: function (event) {
-            var viewportBounds = myDragon.viewport.getBounds();
-//            var tiledImage = myDragon.world.getItemAt(0); // Assuming you want the first (or only) image
-//            var imageBounds = tiledImage.viewportToImageRectangle(viewportBounds);
-            var posJSON = 'x:' + precise(viewportBounds.x) + ',y:' + precise(viewportBounds.y) +
-                          ',w:' + precise(viewportBounds.width) + ',h:' + precise(viewportBounds.height);
-
-            if (window.history.replaceState) {
-              newLoc = window.location.href.replace(/#.*/, "") + '#' + posJSON;
-              window.history.replaceState({ }, document.title, newLoc);
-            }
-          }
-        });
-    </script>
     <script src="linked.js"></script>
     <script src="resources/domain_control.js"></script> <!-- Must be after the domain-selector input element -->
 
