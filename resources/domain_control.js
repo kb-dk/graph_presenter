@@ -732,7 +732,7 @@ function markShortestPath(sourceName, destName, clearOverlays = true) {
 var stateToURL = function() {
     var posJSON = 'type=' + state.searchType + ';overlay=' + state.showOverlay +
         ';mark=' + state.markDomainsMatching + ';source=' + state.sourceNode + ';dest=' + state.destNode +
-        ';selected=' + state.selectedNodes.toString();
+        ';direction=' + state.direction + ';selected=' + state.selectedNodes.toString();
     console.log("Storing " + posJSON);
     if (window.history.replaceState) {
         newLoc = window.location.href.replace(/#.*/, "") + '#' + posJSON;
@@ -741,10 +741,9 @@ var stateToURL = function() {
 }
 
 // .../index.html#type=search;overlay=true;mark=;source=hvam.eu;dest=;selected=128,168
-var URLToState = function() {
+var URLToState = function(fireChange = true) {
     // TODO: Update type, source and dest without firing events
-    //    var myRegexp = /.*#type=([^;]+);overlay=([^;]+);mark=([^;]+);source=([^;]*);dest=([^;]*);selected=([^;]*)/
-    var myRegexp = /.*#type=([^;]+);overlay=([^;]+);mark=([^;]*);source=([^;]*);dest=([^;]*);selected=([^;]*)/
+    var myRegexp = /.*#type=([^;]+);overlay=([^;]+);mark=([^;]*);source=([^;]*);dest=([^;]*);direction=([^;]*);selected=([^;]*)/
     var match = myRegexp.exec(window.location.href);
     if (match) {
         console.log("Restoring state from URL hash");
@@ -753,25 +752,61 @@ var URLToState = function() {
         state.markDomainsMatching = match[3];
         state.sourceNode = match[4];
         state.destNode = match[5];
-        if (match[6] != '') {
-            var nodeIDs = match[6].split(",");
+        state.direction = match[6];
+        if (match[7] != '') {
+            var nodeIDs = match[7].split(",");
             state.selectedNodes = [];
             for (var i = 0 ; i < nodeIDs.length ; i++) {
                 state.selectedNodes.push(Number(nodeIDs[i]));
             }
         }
-        fireStateChange();
+        if (fireChange) {
+            fireStateChange();
+        }
     }
 }
 
-var handleStateChange = function() {
-    clearAllOverlays(); // FIXME: Quite clumsy to freeze the OpenSeadragon instance this way
-
+var stateToGUI = function() {
     switch (state.searchType) {
     case "search":
         domainSelectorToInput.style.visibility = 'hidden';
         directionSelect.style.visibility = 'hidden';
+        if (searchTypeSelect.selectedIndex != 0) {
+            searchTypeSelect.selectedIndex = 0;
+            searchTypeSelect.options[0].selected = true;
+        }
+        // TODO: Update source, direction & destination
+        break;
+    case "connect":
+        domainSelectorToInput.style.visibility = 'visible';
+        directionSelect.style.visibility = 'visible';
+        if (searchTypeSelect.selectedIndex != 1) {
+            searchTypeSelect.selectedIndex = 1;
+            searchTypeSelect.options[1].selected = true;
+        }
+        break;
+    }
 
+    var index = 0; // default is "bi"
+    switch (state.direction) {
+    case "out":
+        index = 1;
+        break;
+    case "in":
+        index = 2;
+        break;
+    }
+    if (directionSelect.selectedIndex != index) {
+        directionSelect.selectedIndex = index;
+        directionSelect.options[index].selected = true;
+    }
+}
+
+var stateToVisual = function() {
+    clearAllOverlays(); // FIXME: Quite clumsy to freeze the OpenSeadragon instance this way
+
+    switch (state.searchType) {
+    case "search":
         if (state.showOverlay && state.selectedNodes.length > 0) {
             ensureSVGOverlay();
             for (var i = 0 ; i < state.selectedNodes.length ; i++) {
@@ -780,9 +815,6 @@ var handleStateChange = function() {
         }
         break;
     case "connect":
-        domainSelectorToInput.style.visibility = 'visible';
-        directionSelect.style.visibility = 'visible';
-
         var ni = findNodeIndexes(state.sourceNode, state.destNode);
         if ((state.showOverlay && (ni.sourceIndex != -1 || ni.destIndex != -1)) ||
             (ni.sourceIndex != -1 && ni.destIndex != -1)) {
@@ -795,12 +827,17 @@ var handleStateChange = function() {
     if (state.markDomainsMatching != '') {
         markMatching(state.markDomainsMatching, false);
     }
+}
+
+var handleStateChange = function() {
+    stateToGUI();
+    stateToVisual();
     stateToURL();
 }
 
 // searchType: search|connect
 // showOverlay: true|false // true = show SVG overlay with nodes and edges
-// focus: domainFrom|domainTo|<empty> // domain* = show animated circles for matching nodes
+// direction: bi|out|in
 var state = {
     searchType: 'search',
     showOverlay: 'false',
@@ -808,10 +845,13 @@ var state = {
     
     sourceNode: "",
     destNode: "",
+    direction: "bi",
     selectedNodes: []
 }
 
-var ignoreFirstNodeChange = false;
+var ignoreFirstSearchTypeChange = false;
+var ignoreFirstSourceNodeChange = false;
+var ignoreFirstDestNodeChange = false;
 var animationCallback = null;
 var abortStateChange = function() {
     if (animationCallback != null) {
@@ -824,9 +864,20 @@ var fireStateChange = function() {
     });
 }
 
+var searchTypeChanged = function(e) {
+    if (ignoreFirstSearchTypeChange) {
+        ignoreFirstSearchTypeChange = false;
+        return;
+    }
+    abortStateChange();
+    state.searchType = searchTypeSelect.value;
+    state.showOverlay = false;
+    state.selectedNodes = [];
+    fireStateChange();
+}
 var sourceNodeChanged = function(e) {
-    if (ignoreFirstNodeChange) {
-        ignoreFirstNodeChange = false;
+    if (ignoreFirstSourceNodeChange) {
+        ignoreFirstSourceNodeChange = false;
         return;
     }
     abortStateChange();
@@ -835,8 +886,8 @@ var sourceNodeChanged = function(e) {
     fireStateChange();
 }
 var destNodeChanged = function(e) {
-    if (ignoreFirstNodeChange) {
-        ignoreFirstNodeChange = false;
+    if (ignoreFirstDestNodeChange) {
+        ignoreFirstDestNodeChange = false;
         return;
     }
     abortStateChange();
@@ -846,25 +897,32 @@ var destNodeChanged = function(e) {
     //    message("Finding shortest path from '" + domainInput + "' to '" + domainToInput + "'...");
     fireStateChange();
 }
-
-var searchTypeChanged = function(e) {
+var directionChanged = function(e) {
     abortStateChange();
-    state.searchType = document.getElementById("search-type").value;
-    state.showOverlay = false;
-    state.selectedNodes = [];
+    switch (directionSelect.selectedIndex) {
+    case 1:
+        state.direction = "out";
+        break;
+    case 2:
+        state.direction = "in";
+        break;
+    default:
+        state.direction = "bi";
+        break;
+    }
     fireStateChange();
 }
 
 function clickedNode(domain, domainIndex, shift) {
-    abortStateChange();
-    switch (state.searchType) {
+   abortStateChange(); 
+   switch (state.searchType) {
     case "search":
         state.sourceNode = domain.d;
         state.selectedNodes.push(domainIndex);
         state.showOverlay = true;
         state.markDomainsMatching = '';
 
-        ignoreFirstNodeChange = true;
+        ignoreFirstSourceNodeChange = true;
         domainSelectorInput.value = ' ' + state.sourceNode + ' ';
         break;
     case "connect":
@@ -873,14 +931,14 @@ function clickedNode(domain, domainIndex, shift) {
             state.markDomainsMatching = '';
             state.showOverlay = true;
 
-            ignoreFirstNodeChange = true;
+            ignoreFirstSourceNodeChange = true;
             domainSelectorInput.value = ' ' + state.sourceNode + ' ';
         } else {
             state.destNode = domain.d;
             state.markDomainsMatching = '';
             state.showOverlay = true;
 
-            ignoreFirstNodeChange = true;
+            ignoreFirstDestNodeChange = true;
             domainSelectorToInput.value = ' ' + state.destNode + ' ';
         }
         break;
@@ -935,26 +993,27 @@ var canvasClicked = function(info) {
     clickedOutsideNodes(info.shift);
 }
 
+var searchTypeSelect = document.getElementById("search-type");
 var domainSelectorInput = document.getElementById("domain-selector");
 var domainSelectorToInput = document.getElementById("domain-selector-to");
-var searchTypeSelect = document.getElementById("search-type");
 var directionSelect = document.getElementById("connect-direction");
 if (typeof myDragon == 'undefined') {
     console.error("Error: The variable 'myDragon' is not set. Unable to provide visual domain marking");
 } else if (typeof domains == 'undefined') {
     console.error("Error: The variable 'domains' is not set. Unable to provide domain search");
 } else {
+    URLToState(false);
+    stateToGUI(); // Call this before adding handlers
+
     myDragon.addHandler('canvas-click', canvasClicked);
     if (searchTypeSelect) {
-        searchTypeSelect.selectedIndex = 0;
         searchTypeSelect.addEventListener("input", searchTypeChanged);
     } else {
         searchTypeSelect = new Object(); // Dummy
         console.log("Warning: Unable to locate an search type select id 'search-type'");
     }
     if (directionSelect) {
-        directionSelect.selectedIndex = 0;
-        directionSelect.addEventListener("input", destNodeChanged);
+        directionSelect.addEventListener("input", directionChanged);
     } else {
         directionSelect = new Object(); // Dummy
         console.log("Warning: Unable to locate connection direction select id 'connect-direction'");
@@ -976,5 +1035,5 @@ if (typeof myDragon == 'undefined') {
         var domainFeedback = new Object(); // Dummy
         console.log("Warning: Unable to locate an element with id 'domain-feedback': Feedback on domain matching is disabled");
     }
-    myDragon.viewport.viewer.addHandler("open", URLToState);
+    myDragon.viewport.viewer.addHandler("open", stateToVisual);
 }
