@@ -175,8 +175,8 @@ function ctemplate() {
 
 # Returns largest DPI from wanted width & height 
 get_dpi() {
-    local W_DPI=$(( "$RENDER_WIDTH" * 72 / $(head -n 100 "$SVG" | tr '\n' ' ' | grep -o '<svg[^<]*width="[0-9.]*"' | grep -o 'width=.*' | sed 's/[^0-9]*\([0-9]*\).*/\1/') ))
-    local H_DPI=$(( "$RENDER_HEIGHT" * 72 / $(head -n 100 "$SVG" | tr '\n' ' ' | grep -o '<svg[^<]*height="[0-9.]*"' | grep -o 'height=.*' | sed 's/[^0-9]*\([0-9]*\).*/\1/') ))
+    local W_DPI=$(( $RENDER_WIDTH * 72 / $(head -n 100 "$SVG" | tr '\n' ' ' | grep -o '<svg[^<]*width="[0-9.]*"' | grep -o 'width=.*' | sed 's/[^0-9]*\([0-9]*\).*/\1/') ))
+    local H_DPI=$(( $RENDER_HEIGHT * 72 / $(head -n 100 "$SVG" | tr '\n' ' ' | grep -o '<svg[^<]*height="[0-9.]*"' | grep -o 'height=.*' | sed 's/[^0-9]*\([0-9]*\).*/\1/') ))
     if [[ "$W_DPI" -lt "$H_DPI" ]]; then
         echo "$H_DPI"
     else
