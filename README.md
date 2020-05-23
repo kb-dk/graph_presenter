@@ -52,11 +52,14 @@ The `./generate_presentation.sh` script is at its core extremely simple:
 
 The JavaScript `domain_control.js` supports search by looking sequentially through all the node-names generated in step #3 and getting their coordinates. For each of these coordinates, an overlay is added to the OpenSeadragon display.
 
+The only tricky part is the code for finding the shortest path between two nodes: It uses [Dijkstra's Shortest Path First algorithm](https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm) with the state being represented using compact arrays instead of objects.
+
 
 # Notes & to-do
-* Rendering in 50K is doable on a 16GB machine, but might take hours. More RAM helps a lot. GraphicsMagic is the bottleneck here.
+* Rendering with GraphicsMagic in 50K is doable on a 16GB machine, but might take hours. More RAM helps a lot. vips is vastly superior for larger sizes.
 * GraphicsMagic has a problem with kerning for some renders.
 * Both render-size and font-kerning seems to have been solved in the latest version of `vips` described in the section below.
+* Moving search and shortest-path server-side would allow for larger scale renders, but introducing a backend would make it a lot more complicated to get a graph presentation to work
 
 # Adventures with vips
 
