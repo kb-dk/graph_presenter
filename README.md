@@ -30,7 +30,7 @@ nodes with 800K edges. The limit is dictated by browser memory.
 * [C64+Amiga domain graph from the Danish net archive](https://labs.statsbiblioteket.dk/linkgraph/c64/) - 57,432 nodes
 * ["All" domains from 1998-2003 from the Danish net archive](https://labs.statsbiblioteket.dk/linkgraph/1998_to_2003/) - 79,012 nodes
 
-These demos currently only provide search, not shortest path discovery. See the [temporary C64+Amiga graph](https://labs.statsbiblioteket.dk/linkgraph/c64_overlay/) for shortest path discovery: Select `Connect` in the drop-down, click on a domain-circle in the graph, then shift-click on another corcle.
+These demos provide search as well as shortest path discovery. For shortest path discovery select `Connect` in the drop-down; click on a domain-circle in the graph, then shift-click on another corcle.
 
 
 ## How-to
