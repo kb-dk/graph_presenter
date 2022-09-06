@@ -6,7 +6,7 @@ Primarily maintained by Toke Eskildsen, [toes@kb.dk](mailto:toes@kb.dk), Royal D
 
 ## Requirements
 
-* bash, wget, GraphicsMagic, vips (only tested under Ubuntu)
+* bash, xmllint, wget, GraphicsMagic, vips (only tested under Ubuntu)
 * SVG exported from Gephi
 
 
