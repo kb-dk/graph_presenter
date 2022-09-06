@@ -191,6 +191,17 @@ batch_render() {
     fi
 }
 
+render() {
+    local LINES=$(normalise_svg | grep '<' | wc -l)
+    if [[ "$LINES" -le "$BATCH_LINES" ]]; then
+        echo " - Rendering directly to $IMAGE as input is only $LINES lines"
+        local IN="${SVG}[dpi=${DPI},unlimited]"
+        vips copy "$IN" "$IMAGE"
+    else
+        batch_render
+    fi
+}
+
 ###############################################################################
 # CODE
 ###############################################################################
@@ -199,7 +210,7 @@ S_START=$(date +%s)
 check_parameters "$@"
 echo "Starting convertion of $SVG to $IMAGE $(date +"%Y-%m%d %H:%M")"
 DPI=$(get_dpi)
-batch_render
+render
 
 S_END=$(date +%s)
 echo "Finished $(date +"%Y-%m%d %H:%M") ($((S_END-S_START)) seconds), result as $IMAGE"
