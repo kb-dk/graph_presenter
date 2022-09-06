@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# librsvg is limited to SVGs of ither 200,000 or 1,000,000 nodes, depending
+# librsvg is limited to SVGs of either 200,000 or 1,000,000 nodes, depending
 # on version:
 #  https://gitlab.gnome.org/GNOME/librsvg/-/issues/574
 #  https://gitlab.gnome.org/GNOME/librsvg/-/blob/main/src/limits.rs
@@ -34,7 +34,7 @@ BASE=${BASE%.*}
 : ${RENDER_WIDTH:="$RENDER_SIZE"}
 : ${RENDER_HEIGHT:="$RENDER_SIZE"}
 
-: ${BATCH_LINES:="150000"} # Keep this well below 200k to be sure we don't hit the limit
+: ${SVG_MAX_LINES:="190000"} # Keep this well below 200k to be sure we don't hit the limit
 : ${CLEAN_UP:="true"}
 
 popd > /dev/null
@@ -105,7 +105,7 @@ extract_part() {
     if [[ ! -s "${T}/${PART}.xml" ]]; then
         >&2 echo "Error: No $PART extracted from $SVG"
     fi
-    split -l $BATCH_LINES -a 4 "${T}/${PART}.xml" "${T}/${PART}-part.xml_"
+    split -l $SVG_MAX_LINES -a 4 "${T}/${PART}.xml" "${T}/${PART}-part.xml_"
 }
 
 render_part() {
@@ -151,7 +151,7 @@ batch_render() {
     
     local IN="${SVG}[dpi=${DPI},unlimited]"
     local LINES=$(normalise_svg | grep '<' | wc -l)
-    echo " - Splitting SVG with $LINES lines in parts of max $BATCH_LINES lines"
+    echo " - Splitting SVG with $LINES lines in parts of max $SVG_MAX_LINES lines"
     echo "   - Extracting header"
     normalise_svg | sed 's/<style\/>/<style><\/style>/' | grep -B 999999999 '</style>' > "${T}/header.xml"
     if [[ ! -s "${T}/header.xml" ]]; then
@@ -193,7 +193,7 @@ batch_render() {
 
 render() {
     local LINES=$(normalise_svg | grep '<' | wc -l)
-    if [[ "$LINES" -le "$BATCH_LINES" ]]; then
+    if [[ "$LINES" -le "$SVG_MAX_LINES" ]]; then
         echo " - Rendering directly to $IMAGE as input is only $LINES lines"
         local IN="${SVG}[dpi=${DPI},unlimited]"
         vips copy "$IN" "$IMAGE"
