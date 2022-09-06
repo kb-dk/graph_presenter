@@ -41,6 +41,12 @@ DZI="${BASE}.dzi"
 : ${RENDER_HEIGHT:="$RENDER_SIZE"}
 : ${FORMAT:="png"} # Gephi charts are circles, lines and text so PNG is probably best choice
 
+# librsvg is limited to SVGs of either 200,000 or 1,000,000 nodes, depending
+# on version, so we offload rendering to svg_render.sh if the SVG looks too big
+#  https://gitlab.gnome.org/GNOME/librsvg/-/issues/574
+#  https://gitlab.gnome.org/GNOME/librsvg/-/blob/main/src/limits.rs
+: ${SVG_MAX_LINES:="190000"}
+
 # sed performance tuning
 : ${SED_BATCH_SIZE:="500"} # 500 was selected from a few ad hoc experiments. Increasing beyond 1000 slows overall processing
 : ${SED_THREADS:=$(nproc)} # Increasing this well (3x) beyond the number of physical cores has a positive effect (30-40%)
@@ -143,6 +149,10 @@ check_parameters() {
 # FUNCTIONS
 ################################################################################
 
+normalise_svg() {
+    tr '\n' ' ' < "$SVG" | sed -e 's/> */>/g' -e 's/ *</</g' | xmllint --format - 
+}
+
 fetch_dragon() {
     if [[ -s "$SCRIPT_HOME/osd/$OSD_ZIP" ]]; then
         return
@@ -189,7 +199,11 @@ create_png() {
         echo "- Skipping generation of $PNG as it already exists"
         return
     fi
-    if [[ "true" == "$VIPS_ONLY" ]]; then
+    local SVG_LINES=$(normalise_svg | wc -l)
+    if [[ "$SVG_LINES" -gt "$SVG_MAX_LINES" ]]; then
+        echo "- Generating $PNG with dimensions ${RENDER_WIDTH}x${RENDER_HEIGHT} pixels using_render.sh as the SVG has more than $SVG_MAX_LINES"
+        RENDER_SIZE="$RENDER_SIZE" RENDER_WIDTH="$RENDER_WIDTH" RENDER_HEIGHT="$RENDER_HEIGHT" SVG_MAX_LINES="$SVG_MAX_LINES" CLEAN_UP="$CLEAN_UP" ${SCRIPT_HOME}/svg_render.sh "$SVG" "$PNG"
+    elif [[ "true" == "$VIPS_ONLY" ]]; then
         local DPI=$(get_dpi)
         echo "- Generating $PNG with minimum dimensions ${RENDER_WIDTH}x${RENDER_HEIGHT} pixels (dpi=${SPI}) using vips"
         vips copy "${SVG}[dpi=${DPI},unlimited]" "$PNG"
@@ -213,9 +227,14 @@ create_deepzoom() {
         fi
         VIPS_DIRECT="true"
     else
+        local SVG_LINES=$(normalise_svg | wc -l)
         if [[ "true" == "$VIPS_ONLY" ]]; then
-            echo "- PNG exists (${PNG}), but VIPS_ONLY=true: Tiles will be generated from SVG ($SVG)"
-            VIPS_DIRECT="true"
+            if [[ "$SVG_LINES" -gt "$SVG_MAX_LINES" ]]; then
+                echo "- PNG exists (${PNG}) and VIPS_ONLY=true but the SVG exceeds the limit of $SVG_MAX_LINES lines: Tiles will be generated from the PNG ($SVG)"
+            else
+                echo "- PNG exists (${PNG}), but VIPS_ONLY=true: Tiles will be generated from SVG ($SVG)"
+                VIPS_DIRECT="true"
+            fi
         fi
         
     fi
@@ -237,10 +256,6 @@ create_deepzoom() {
 #        <circle fill-opacity="1.0" fill="#ff5584" r="20.0" cx="-54.279125"
 #                class="id_ekot.dk" cy="-78.99566" stroke="#000000"
 #                stroke-opacity="1.0" stroke-width="1.0"/>
-
-normalise_svg() {
-    tr '\n' ' ' < "$SVG" | sed -e 's/> */>/g' -e 's/ *</</g' | xmllint --format - 
-}
 
 collapse() {
     local LAST="%%%"
@@ -571,11 +586,19 @@ S_START=$(date +%s)
 echo "Starting processing of $SVG $(date +"%Y-%m%d %H:%M")"
 check_parameters "$@"
 
+if [[ "true" != "$RENDER_PNG" ]]; then
+    SVG_LINES=$(normalise_svg | wc -l)
+    if [[ "$SVG_LINES" -gt "$SVG_MAX_LINES" ]]; then
+        echo "- Forcing PNG creation as the SVG is too large for direct render"
+        RENDER_PNG=true
+    fi
+fi
+
 if [[ "true" == "$RENDER_PNG" ]]; then
     create_png
 elif [[ "false" == "$VIPS_ONLY" ]]; then
     if [[ "false" == "$RENDER_TILES" ]]; then
-    echo "- Skipping rendering of PNG as RENDER_PNG=${RENDER_PNG} and RENDER_TILES=${RENDER_TILES}"
+        echo "- Skipping rendering of PNG as RENDER_PNG=${RENDER_PNG} and RENDER_TILES=${RENDER_TILES}"
     else 
         echo "- RENDER_PNG=${RENDER_PNG} specified, but with VIPS_ONLY=${VIPS_ONLY}, a PNG is required and will thus be rendered anywat"
         create_png
