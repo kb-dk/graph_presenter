@@ -600,7 +600,7 @@ elif [[ "false" == "$VIPS_ONLY" ]]; then
     if [[ "false" == "$RENDER_TILES" ]]; then
         echo "- Skipping rendering of PNG as RENDER_PNG=${RENDER_PNG} and RENDER_TILES=${RENDER_TILES}"
     else 
-        echo "- RENDER_PNG=${RENDER_PNG} specified, but with VIPS_ONLY=${VIPS_ONLY}, a PNG is required and will thus be rendered anywat"
+        echo "- RENDER_PNG=${RENDER_PNG} specified, but with VIPS_ONLY=${VIPS_ONLY}, a PNG is required and will thus be rendered anyway"
         create_png
     fi
 else
