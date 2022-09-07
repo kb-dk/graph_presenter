@@ -103,7 +103,7 @@ extract_part() {
     echo "   - Extracting $PART"
     normalise_svg | grep -A 999999999 "<g id=\"$PART\">" | grep -B 999999999 '</g>' -m 1 | grep -v '</\?g' > "${T}/${PART}.xml"
     if [[ ! -s "${T}/${PART}.xml" ]]; then
-        >&2 echo "Error: No $PART extracted from $SVG"
+        >&2 echo "Warning: No $PART extracted from ${SVG}. Suspicious but not fatal"
     fi
     split -l $SVG_MAX_LINES -a 4 "${T}/${PART}.xml" "${T}/${PART}-part.xml_"
 }
@@ -153,9 +153,11 @@ batch_render() {
     local LINES=$(normalise_svg | grep '<' | wc -l)
     echo " - Splitting SVG with $LINES lines in parts of max $SVG_MAX_LINES lines"
     echo "   - Extracting header"
-    normalise_svg | sed 's/<style\/>/<style><\/style>/' | grep -B 999999999 '</style>' > "${T}/header.xml"
+    normalise_svg | grep -B 999999 -m 1 '<g ' | head -n -1 > "${T}/header.xml"
+#    normalise_svg | sed 's/<style\/>/<style><\/style>/' | grep -B 999999999 '</style>' > "${T}/header.xml"
     if [[ ! -s "${T}/header.xml" ]]; then
         >&2 echo "Error: No header extracted from $SVG"
+        exit 10
     fi
 
     for PART in $PARTS; do
