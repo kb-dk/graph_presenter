@@ -1,14 +1,14 @@
 # graph_presenter
 Generates searchable DeepZoom presentations of Gephi graphs
 
-Primarily maintained by Toke Eskildsen, [toes@kb.dk](mailto:toes@kb.dk), Royal Danish Library
-
+Developed by Toke Eskildsen, [toes@kb.dk](mailto:toes@kb.dk), Royal Danish Library
+Primarily maintained by Thomas Egense, [thomas.egense@gmail.com](mailto:thomas.egense@gmail.com), Royal Danish Library
 
 ## Requirements
 
 * bash, wget, GraphicsMagic, vips (only tested under Ubuntu)
 * SVG exported from Gephi
-
+* Gephi changed SVG path element format (d parameter) from release 1.0 and Graph-Presenter has not been updated to read this format yet. Use Gephi version prior to release 1.0.
 
 ## Introduction
 [Gephi](https://gephi.org/) graphs (connected nodes) are hard to visualise at scale in a browser:
