@@ -2,6 +2,7 @@
 Generates searchable DeepZoom presentations of Gephi graphs
 
 Developed by Toke Eskildsen, [toes@kb.dk](mailto:toes@kb.dk), Royal Danish Library
+
 Primarily maintained by Thomas Egense, [thomas.egense@gmail.com](mailto:thomas.egense@gmail.com), Royal Danish Library
 
 ## Requirements
