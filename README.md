@@ -7,7 +7,7 @@ Primarily maintained by Thomas Egense, [thomas.egense@gmail.com](mailto:thomas.e
 
 ## Requirements
 
-* bash, wget, GraphicsMagic, vips (only tested under Ubuntu)
+* bash, xmllint, wget, GraphicsMagic, vips (only tested under Ubuntu)
 * SVG exported from Gephi
 * Gephi changed SVG path element format (d parameter) from release 1.0 and Graph-Presenter has not been updated to read this format yet. **Use Gephi version prior to release 0.10.0**
 
